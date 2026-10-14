@@ -6,12 +6,12 @@ from sweepkit.devices import (SR830, SR850, DriverError, FakeTransport,
 
 
 async def test_k24xx_ramps_and_reads():
-    t = FakeTransport({":READ?": "1.0,2e-9,0,0,0"})
+    t = FakeTransport({":READ?": "1.0,2e-9,0,0,0", ":SENS:CURR:PROT:TRIP?": "0"})
     k = Keithley24xx("gate", t, "2410", limits=(-5, 5), max_rate=100, step_dt=0.001, settle_s=0)
     await k.set(1.0)
     levels = [c for c in t.log if c.startswith(":SOUR:VOLT:LEV")]
     assert len(levels) > 1 and levels[-1] == ":SOUR:VOLT:LEV 1"
-    assert await k.read() == {"gate.v": 1.0, "gate.i": 2e-9}
+    assert await k.read() == {"gate.v": 1.0, "gate.i": 2e-9, "gate.compliance": 0.0}
 
 
 async def test_k24xx_rejects_out_of_limits():

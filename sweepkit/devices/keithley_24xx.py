@@ -21,18 +21,26 @@ class _Dialect:
     max_v: float
     max_i: float
     limit_cmd: dict[str, str]   # source mode -> compliance command prefix
+    trip_cmd: dict[str, str]    # source mode -> "compliance tripped?" query
     legacy_format: bool         # 2400-family needs :FORM:ELEM to pick V,I
 
 
+_TRIP_LEGACY = {"volt": ":SENS:CURR:PROT:TRIP?", "curr": ":SENS:VOLT:PROT:TRIP?"}
+
 _DIALECTS = {
     "2400": _Dialect("2400", 210.0, 1.05,
-                     {"volt": ":SENS:CURR:PROT", "curr": ":SENS:VOLT:PROT"}, True),
+                     {"volt": ":SENS:CURR:PROT", "curr": ":SENS:VOLT:PROT"},
+                     _TRIP_LEGACY, True),
     "2401": _Dialect("2401", 20.0, 1.05,
-                     {"volt": ":SENS:CURR:PROT", "curr": ":SENS:VOLT:PROT"}, True),
+                     {"volt": ":SENS:CURR:PROT", "curr": ":SENS:VOLT:PROT"},
+                     _TRIP_LEGACY, True),
     "2410": _Dialect("2410", 1100.0, 1.05,
-                     {"volt": ":SENS:CURR:PROT", "curr": ":SENS:VOLT:PROT"}, True),
+                     {"volt": ":SENS:CURR:PROT", "curr": ":SENS:VOLT:PROT"},
+                     _TRIP_LEGACY, True),
     "2450": _Dialect("2450", 200.0, 1.05,
-                     {"volt": ":SOUR:VOLT:ILIM", "curr": ":SOUR:CURR:VLIM"}, False),
+                     {"volt": ":SOUR:VOLT:ILIM", "curr": ":SOUR:CURR:VLIM"},
+                     {"volt": ":SOUR:VOLT:ILIM:TRIP?", "curr": ":SOUR:CURR:VLIM:TRIP?"},
+                     False),
 }
 
 
@@ -43,7 +51,8 @@ class Keithley24xx:
                  mode: str = "volt", compliance: float = 1e-6,
                  limits: tuple[float, float] = (-1.0, 1.0),
                  max_rate: float = 0.5, nplc: float = 1.0,
-                 settle_s: float = 0.05, step_dt: float = 0.05):
+                 settle_s: float = 0.05, step_dt: float = 0.05,
+                 check_compliance: bool = True):
         if model not in _DIALECTS:
             raise ValueError(f"unsupported model {model!r}")
         if mode not in ("volt", "curr"):
@@ -53,6 +62,7 @@ class Keithley24xx:
         self.compliance, self.limits = compliance, limits
         self.max_rate, self.nplc = max_rate, nplc
         self.settle_s, self.step_dt = settle_s, step_dt
+        self.check_compliance = check_compliance
         self._level = 0.0
         hard = self.d.max_v if mode == "volt" else self.d.max_i
         if limits[0] > limits[1] or max(abs(limits[0]), abs(limits[1])) > hard:
@@ -64,8 +74,11 @@ class Keithley24xx:
 
     # -- contract ---------------------------------------------------------
     def describe(self) -> dict[str, FieldInfo]:
-        return {f"{self.name}.v": FieldInfo("V", f"{self.name} voltage"),
-                f"{self.name}.i": FieldInfo("A", f"{self.name} current")}
+        out = {f"{self.name}.v": FieldInfo("V", f"{self.name} voltage"),
+               f"{self.name}.i": FieldInfo("A", f"{self.name} current")}
+        if self.check_compliance:
+            out[f"{self.name}.compliance"] = FieldInfo("", f"{self.name} in compliance (0/1)")
+        return out
 
     async def configure(self) -> None:
         """Put the instrument in a known state; output stays OFF."""
@@ -104,7 +117,11 @@ class Keithley24xx:
         if len(parts) < 2:
             raise DriverError(f"{self.name}: bad reading {raw!r}")
         v, i = float(parts[0]), float(parts[1])
-        return {f"{self.name}.v": v, f"{self.name}.i": i}
+        out = {f"{self.name}.v": v, f"{self.name}.i": i}
+        if self.check_compliance:
+            trip = await self.t.query(self.d.trip_cmd[self.mode])
+            out[f"{self.name}.compliance"] = 1.0 if trip.strip() not in ("0", "+0") else 0.0
+        return out
 
     async def snapshot(self) -> dict:
         return {"idn": await self.t.query("*IDN?"), "model": self.d.model,

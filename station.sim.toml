@@ -1,0 +1,24 @@
+# Offline station: every device simulated. Use for dry runs and learning the CLI.
+[station]
+name = "sim"
+shutdown_order = ["gate", "bias", "magnet"]
+
+[devices.gate]
+driver = "sim_source"
+limits = [-10.0, 10.0]
+delay = 0.01
+
+[devices.bias]
+driver = "sim_source"
+limits = [-1.0, 1.0]
+
+[devices.magnet]
+driver = "sim_magnet"
+limits = [-9.0, 9.0]
+max_rate = 5.0
+
+[devices.lockin]
+driver = "sim_lockin"
+source = "gate"
+gain = 1e-3
+noise = 1e-6

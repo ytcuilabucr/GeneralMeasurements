@@ -15,7 +15,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from ..engine.events import Event, RunStart, RunStop
+from ..engine.events import Event, Note, RunStart, RunStop
 
 SCHEMA_VERSION = 1
 
@@ -27,6 +27,8 @@ def _plan_json(plan) -> str:
 def resume_point(path: str | Path) -> int:
     """Number of completed points in an existing run file (= next seq to run)."""
     with h5py.File(path, "r") as f:
+        if f.attrs.get("mode") == "fly":
+            raise ValueError("fly runs cannot be resumed")
         return int((f["data/seq"][...] >= 0).sum())
 
 
@@ -44,6 +46,9 @@ class HDF5Sink:
                     self._start(item)
                 elif isinstance(item, Event):
                     await self._event(item)
+                elif isinstance(item, Note):
+                    if self._f is not None:
+                        self._log(self._f, item.message)
                 elif isinstance(item, RunStop):
                     self._stop(item)
         finally:
@@ -75,19 +80,31 @@ class HDF5Sink:
         p = f.create_group("plan")
         p.attrs["plan_json"] = plan_json
         p.attrs["shape"] = list(rs.shape)
-        p.attrs["axis_names"] = [ax.device for ax in rs.plan.axes]
+        p.attrs["axis_names"] = list(rs.plan.axis_names)
 
         sp = f.create_group("setpoints")
-        for ax in rs.plan.axes:
+        for ax in getattr(rs.plan, "axes", ()):
             sp.create_dataset(ax.device, data=np.asarray(ax.points, dtype=float))
 
+        fly = getattr(rs.plan, "mode", "stepped") == "fly"
+        a["mode"] = "fly" if fly else "stepped"
         d = f.create_group("data")
-        for name, info in rs.fields.items():
+        if fly:   # 1D streams: resizable, one row per sample
+            p.attrs["shape"] = []
+            sp.create_dataset(rs.plan.device, shape=(0,), maxshape=(None,), dtype="f8")
+            for name, info in rs.fields.items():
+                ds = d.create_dataset(name, shape=(0,) + tuple(info.shape),
+                                      maxshape=(None,) + tuple(info.shape), dtype=info.dtype)
+                ds.attrs["units"], ds.attrs["label"] = info.units, info.label or name
+            d.create_dataset("timestamp", shape=(0,), maxshape=(None,), dtype="f8")
+            d.create_dataset("seq", shape=(0,), maxshape=(None,), dtype="i8")
+        for name, info in ({} if fly else rs.fields).items():
             ds = d.create_dataset(name, shape=tuple(rs.shape) + tuple(info.shape),
                                   dtype=info.dtype, fillvalue=np.nan)
             ds.attrs["units"], ds.attrs["label"] = info.units, info.label or name
-        d.create_dataset("timestamp", shape=rs.shape, dtype="f8", fillvalue=np.nan)
-        d.create_dataset("seq", shape=rs.shape, dtype="i8", fillvalue=-1)
+        if not fly:
+            d.create_dataset("timestamp", shape=rs.shape, dtype="f8", fillvalue=np.nan)
+            d.create_dataset("seq", shape=rs.shape, dtype="i8", fillvalue=-1)
 
         s = f.create_group("snapshot")
         for dev, snap in rs.snapshots.items():
@@ -105,15 +122,35 @@ class HDF5Sink:
     async def _event(self, ev: Event) -> None:
         f = self._f
         d = f["data"]
-        for name, val in ev.data.items():
-            if name not in d:       # field without describe(): scalar, created lazily
-                d.create_dataset(name, shape=f["data/seq"].shape, dtype="f8", fillvalue=np.nan)
-            d[name][ev.index] = val
-        d["timestamp"][ev.index] = ev.timestamp
-        d["seq"][ev.index] = ev.seq    # written last: marks the point complete
+        if f.attrs.get("mode") == "fly":
+            self._fly_event(f, ev)
+        else:
+            for name, val in ev.data.items():
+                if name not in d:   # field without describe(): scalar, created lazily
+                    d.create_dataset(name, shape=f["data/seq"].shape, dtype="f8",
+                                     fillvalue=np.nan)
+                d[name][ev.index] = val
+            d["timestamp"][ev.index] = ev.timestamp
+            d["seq"][ev.index] = ev.seq    # written last: marks the point complete
         self._n += 1
         if self._n % self.flush_every == 0:
             await asyncio.to_thread(f.flush)
+
+    def _fly_event(self, f, ev: Event) -> None:
+        n = ev.seq + 1
+        for dev, v in ev.setpoints.items():
+            ds = f[f"setpoints/{dev}"]
+            ds.resize(n, axis=0)
+            ds[-1] = v
+        d = f["data"]
+        for name, val in ev.data.items():
+            ds = d[name]
+            ds.resize(n, axis=0)
+            ds[-1] = val
+        d["timestamp"].resize(n, axis=0)
+        d["timestamp"][-1] = ev.timestamp
+        d["seq"].resize(n, axis=0)
+        d["seq"][-1] = ev.seq
 
     def _stop(self, st: RunStop) -> None:
         f = self._f

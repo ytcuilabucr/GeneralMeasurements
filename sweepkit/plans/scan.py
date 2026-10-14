@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 
 from .axes import Axis
 
@@ -20,12 +20,18 @@ class Scan:
     metadata: Mapping[str, Any] = field(default_factory=dict)
     watchdogs: tuple[Callable, ...] = ()         # async (Event) -> str | None
 
+    mode: ClassVar[str] = "stepped"
+
     def __post_init__(self):
         if not self.axes:
             raise PlanError("a scan needs at least one axis")
         names = [a.device for a in self.axes]
         if len(set(names)) != len(names):
             raise PlanError(f"duplicate axis devices: {names}")
+
+    @property
+    def axis_names(self) -> tuple[str, ...]:
+        return tuple(a.device for a in self.axes)
 
     @property
     def shape(self) -> tuple[int, ...]:
@@ -62,7 +68,7 @@ class Scan:
 
     def to_dict(self) -> dict:
         """JSON-able description of the plan (stored in the data file)."""
-        return {"axes": [{"device": a.device, "points": list(a.points),
+        return {"mode": "stepped", "axes": [{"device": a.device, "points": list(a.points),
                           "settle_s": a.settle_s, "snake": a.snake} for a in self.axes],
                 "readables": list(self.readables), "shape": list(self.shape),
                 "metadata": dict(self.metadata)}

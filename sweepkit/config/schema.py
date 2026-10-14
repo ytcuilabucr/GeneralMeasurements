@@ -39,7 +39,33 @@ class LockinCfg(_Dev):
     sensitivity: float = 1e-3
 
 
-DeviceCfg = Annotated[K24xxCfg | K2000Cfg | LockinCfg, Field(discriminator="driver")]
+class _Sim(BaseModel):
+    """Simulated devices: no resource, for dry runs and offline development."""
+    model_config = ConfigDict(extra="forbid")
+
+
+class SimSourceCfg(_Sim):
+    driver: Literal["sim_source"]
+    limits: tuple[float, float] = (-10.0, 10.0)
+    delay: float = 0.0
+
+
+class SimMagnetCfg(_Sim):
+    driver: Literal["sim_magnet"]
+    limits: tuple[float, float] = (-9.0, 9.0)
+    max_rate: float = 0.5
+
+
+class SimLockinCfg(_Sim):
+    driver: Literal["sim_lockin"]
+    source: str                      # role name of the SimSource it measures
+    gain: float = 1e-3
+    noise: float = 1e-6
+
+
+DeviceCfg = Annotated[
+    K24xxCfg | K2000Cfg | LockinCfg | SimSourceCfg | SimMagnetCfg | SimLockinCfg,
+    Field(discriminator="driver")]
 
 
 class Station(BaseModel):

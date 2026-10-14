@@ -18,10 +18,12 @@ def load(path: str | Path):
         if ver > SCHEMA_VERSION:
             raise ValueError(f"file schema {ver} is newer than this reader ({SCHEMA_VERSION})")
         axes = [a if isinstance(a, str) else a.decode() for a in f["plan"].attrs["axis_names"]]
-        coords = {a: (a, f[f"setpoints/{a}"][...]) for a in axes}
+        fly = f.attrs.get("mode", "stepped") == "fly"
+        lead = ["sample"] if fly else list(axes)
+        coords = {a: ("sample" if fly else a, f[f"setpoints/{a}"][...]) for a in axes}
         vars_ = {}
         for name, ds in f["data"].items():
-            dims = list(axes) + [f"{name}_dim{i}" for i in range(ds.ndim - len(axes))]
+            dims = lead + [f"{name}_dim{i}" for i in range(ds.ndim - len(lead))]
             out = f"{name}_readback" if name in coords else name
             vars_[out] = (dims, ds[...], {k: v for k, v in ds.attrs.items()})
         attrs = {k: (v.item() if hasattr(v, "item") else v) for k, v in f.attrs.items()}
