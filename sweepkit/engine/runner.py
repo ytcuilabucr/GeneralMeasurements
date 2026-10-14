@@ -169,7 +169,8 @@ async def run(scan, devices: Mapping[str, object], bus: Bus,
                 await prep()
         # guard(): abort() cancels the body at once (e.g. mid-ramp), not at the next point
         if scan.mode == "fly":
-            body = fly_body(scan, devices, emit, controller, make_reader(devices, retry))
+            body = fly_body(scan, devices, emit, controller, make_reader(devices, retry),
+                            note, retry.retry_on)
         else:
             body = _stepped_body(scan, devices, emit, note, controller, read_names,
                                  start_seq, retry, make_reader(devices, retry))

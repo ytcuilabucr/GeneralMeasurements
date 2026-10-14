@@ -29,9 +29,11 @@ def _readback(data: dict, name: str) -> float:
 
 async def fly_body(scan: FlyScan, devices: Mapping[str, object],
                    emit: Callable[[Event], Awaitable[None]],
-                   controller: Controller, read=None) -> None:
+                   controller: Controller, read=None, note=None,
+                   retry_on: tuple[type[BaseException], ...] = (TimeoutError,)) -> None:
     dev = devices[scan.device]
     read = read or (lambda n: devices[n].read())
+    skipped = 0     # samples lost so far under on_sample_error="skip" (whole run)
     # axis readbacks (outer axes too, F4) plus readables, read concurrently per sample
     names = list(dict.fromkeys((*scan.axis_names, *scan.readables)))
     loop = asyncio.get_running_loop()
@@ -73,15 +75,27 @@ async def fly_body(scan: FlyScan, devices: Mapping[str, object],
             await controller.checkpoint()
 
             done = await dev.ramp_done()           # before sampling: last sample is post-ramp
-            results = await asyncio.gather(*(read(n) for n in names))
-            data: dict = {}
-            for r in results:
-                data.update(r)
-            travelled = min(scan.rate * (loop.time() - seg_t0), abs(stop - seg_v0))
-            nominal = stop if done else seg_v0 + sign * travelled
-            await emit(Event(seq, (ramp, k), {**osp, scan.device: nominal}, data))
-            seq += 1
-            k += 1
+            try:
+                results = await asyncio.gather(*(read(n) for n in names))
+            except retry_on as e:
+                if scan.on_sample_error != "skip":
+                    raise
+                skipped += 1
+                if note:
+                    await note(f"ramp {ramp}: sample skipped ({type(e).__name__}: {e}); "
+                               f"{skipped}/{scan.max_skips} allowed")
+                if skipped > scan.max_skips:
+                    raise
+                results = None
+            if results is not None:
+                data: dict = {}
+                for r in results:
+                    data.update(r)
+                travelled = min(scan.rate * (loop.time() - seg_t0), abs(stop - seg_v0))
+                nominal = stop if done else seg_v0 + sign * travelled
+                await emit(Event(seq, (ramp, k), {**osp, scan.device: nominal}, data))
+                seq += 1
+                k += 1
             if done:
                 break
             if loop.time() > deadline:

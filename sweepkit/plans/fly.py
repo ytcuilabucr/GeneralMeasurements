@@ -25,6 +25,8 @@ class FlyScan:
     outer: tuple[Axis, ...] = ()   # stepped axes, outermost first
     snake: bool = False            # alternate ramp direction on successive ramps
     settle_s: float = 0.0          # wait at the start point before each ramp
+    on_sample_error: str = "fail"  # "fail" | "skip": a failed/timed-out sample read
+    max_skips: int = 5             # skip policy: abort once more samples than this are lost
     timeout_s: float | None = None  # per ramp; None: 1.5 x ideal ramp time + 10 s
     metadata: Mapping[str, Any] = field(default_factory=dict)
     watchdogs: tuple[Callable, ...] = ()
@@ -34,6 +36,10 @@ class FlyScan:
     def __post_init__(self):
         if self.rate <= 0 or self.dt <= 0:
             raise PlanError("rate and dt must be > 0")
+        if self.on_sample_error not in ("fail", "skip"):
+            raise PlanError("on_sample_error must be 'fail' or 'skip'")
+        if self.max_skips < 0:
+            raise PlanError("max_skips must be >= 0")
         if self.start == self.stop:
             raise PlanError("start and stop are equal")
         if self.device in {a.device for a in self.outer}:
@@ -79,7 +85,8 @@ class FlyScan:
         return {"mode": "fly", "device": self.device, "start": self.start,
                 "stop": self.stop, "rate": self.rate, "dt": self.dt,
                 "readables": list(self.readables), "settle_s": self.settle_s,
-                "snake": self.snake,
+                "snake": self.snake, "on_sample_error": self.on_sample_error,
+                "max_skips": self.max_skips,
                 "outer": [{"device": a.device, "points": list(a.points),
                            "settle_s": a.settle_s} for a in self.outer],
                 "shape": list(self.shape), "metadata": dict(self.metadata)}

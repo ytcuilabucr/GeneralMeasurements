@@ -240,3 +240,49 @@ async def test_fly_read_timeout_fails_run_and_holds_field():
                   {"g": g, "B": m, "li": li}, Bus(),
                   retry=RetryPolicy(read_timeout_s=0.05))
     assert m.safe
+
+
+# -- fly-mode sample-miss policy -------------------------------------------------
+def _fly_skip(**kw):
+    return FlyScan("B", 0, 1, rate=1.0, dt=0.01, readables=("li",), on_sample_error="skip", **kw)
+
+
+async def test_fly_skip_policy_continues_and_notes_gaps():
+    g, m = SimSource("g"), SimMagnet("B", max_rate=1.0)
+    li = FaultyDevice(SimLockin("li", g), [Fault("read", "timeout", after=5, times=2)])
+    items = []
+    bus = Bus()
+
+    async def grab(sub):
+        async for i in sub:
+            items.append(i)
+    bus.add_sink("grab", grab, critical=False)
+    stop = await run(_fly_skip(max_skips=3), {"g": g, "B": m, "li": li}, bus)
+    await bus.join()
+    assert stop.status == "success"
+    evs = [i for i in items if isinstance(i, Event)]
+    assert [e.seq for e in evs] == list(range(len(evs)))      # seq stays contiguous
+    assert sum("sample skipped" in getattr(i, "message", "") for i in items) == 2
+    gaps = np.diff([e.timestamp for e in evs])
+    assert gaps.max() > 1.8 * np.median(gaps)                 # the hole is visible in time
+
+
+async def test_fly_skip_budget_exceeded_fails_and_holds():
+    g, m = SimSource("g"), SimMagnet("B", max_rate=1.0)
+    li = FaultyDevice(SimLockin("li", g), [Fault("read", "timeout", after=2, times=None)])
+    with pytest.raises(TimeoutError):
+        await run(_fly_skip(max_skips=2), {"g": g, "B": m, "li": li}, Bus())
+    assert m.safe
+
+
+async def test_fly_default_policy_fails_on_first_miss():
+    g, m = SimSource("g"), SimMagnet("B", max_rate=1.0)
+    li = FaultyDevice(SimLockin("li", g), [Fault("read", "timeout", after=2, times=1)])
+    scan = FlyScan("B", 0, 1, rate=1.0, dt=0.01, readables=("li",))
+    with pytest.raises(TimeoutError):
+        await run(scan, {"g": g, "B": m, "li": li}, Bus())
+
+
+def test_fly_policy_validated():
+    with pytest.raises(PlanError):
+        FlyScan("B", 0, 1, rate=1, dt=0.1, on_sample_error="ignore")
