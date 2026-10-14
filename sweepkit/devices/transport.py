@@ -41,13 +41,23 @@ class VisaTransport:
             return inst
         self._inst = await asyncio.to_thread(_open)
 
-    async def write(self, cmd: str) -> None:
+    async def _call(self, fn, *args):
+        """Run a blocking VISA call under the session lock. If the caller is
+        cancelled (abort), keep holding the lock until the call really returns,
+        so a following command can never interleave with a half-finished one."""
         async with self._lock:
-            await asyncio.to_thread(self._inst.write, cmd)
+            fut = asyncio.ensure_future(asyncio.to_thread(fn, *args))
+            try:
+                return await asyncio.shield(fut)
+            except asyncio.CancelledError:
+                await asyncio.gather(fut, return_exceptions=True)
+                raise
+
+    async def write(self, cmd: str) -> None:
+        await self._call(self._inst.write, cmd)
 
     async def query(self, cmd: str) -> str:
-        async with self._lock:
-            return (await asyncio.to_thread(self._inst.query, cmd)).strip()
+        return (await self._call(self._inst.query, cmd)).strip()
 
     async def close(self) -> None:
         if self._inst is not None:

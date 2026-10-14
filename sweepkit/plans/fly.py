@@ -1,12 +1,17 @@
-"""FlyScan: one continuous ramp of a Rampable, sampled every dt until the ramp ends."""
+"""FlyScan: a continuous ramp of a Rampable, sampled every dt until the ramp ends.
+
+Optionally nested under stepped `outer` axes (e.g. a field sweep at each gate
+voltage): one ramp per outer point, `snake=True` alternates ramp direction.
+"""
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
-from .scan import PlanError
+from .axes import Axis
+from .scan import PlanError, Scan
 
 
 @dataclass(frozen=True)
@@ -17,8 +22,10 @@ class FlyScan:
     rate: float                    # units/s, > 0
     dt: float                      # sample interval, s
     readables: tuple[str, ...] = ()
-    settle_s: float = 0.0          # wait at start before the ramp begins
-    timeout_s: float | None = None  # None: 1.5 x ideal ramp time + 10 s
+    outer: tuple[Axis, ...] = ()   # stepped axes, outermost first
+    snake: bool = False            # alternate ramp direction on successive ramps
+    settle_s: float = 0.0          # wait at the start point before each ramp
+    timeout_s: float | None = None  # per ramp; None: 1.5 x ideal ramp time + 10 s
     metadata: Mapping[str, Any] = field(default_factory=dict)
     watchdogs: tuple[Callable, ...] = ()
 
@@ -29,24 +36,53 @@ class FlyScan:
             raise PlanError("rate and dt must be > 0")
         if self.start == self.stop:
             raise PlanError("start and stop are equal")
+        if self.device in {a.device for a in self.outer}:
+            raise PlanError(f"{self.device!r} is both the ramped and an outer axis")
+        if self.outer:
+            Scan(self.outer)       # duplicate/empty outer axes rejected here
 
     @property
     def axis_names(self) -> tuple[str, ...]:
-        return (self.device,)
+        return (*(a.device for a in self.outer), self.device)
 
     @property
     def shape(self) -> tuple[int, ...]:
-        return ()                  # number of samples isn't known in advance
+        """Outer grid shape (number of ramps per axis); () for a single ramp."""
+        return tuple(len(a.points) for a in self.outer)
+
+    @property
+    def n_ramps(self) -> int:
+        n = 1
+        for s in self.shape:
+            n *= s
+        return n
 
     @property
     def duration_s(self) -> float:
         return abs(self.stop - self.start) / self.rate
 
+    def ramps(self) -> Iterator[tuple[int, tuple[int, ...], dict[str, float], float, float]]:
+        """Yield (ramp, outer_index, outer_setpoints, start, stop) per ramp."""
+        if not self.outer:
+            yield 0, (), {}, self.start, self.stop
+            return
+        for r, idx, sp in Scan(self.outer).points():
+            fwd = not (self.snake and r % 2)
+            a, b = (self.start, self.stop) if fwd else (self.stop, self.start)
+            yield r, idx, sp, a, b
+
+    def estimate_time(self, move_s: float = 0.0) -> float:
+        """Seconds: per ramp, the ramp itself + settle + `move_s` to reach the start."""
+        return self.n_ramps * (self.duration_s + self.settle_s + move_s)
+
     def to_dict(self) -> dict:
         return {"mode": "fly", "device": self.device, "start": self.start,
                 "stop": self.stop, "rate": self.rate, "dt": self.dt,
                 "readables": list(self.readables), "settle_s": self.settle_s,
-                "shape": [], "metadata": dict(self.metadata)}
+                "snake": self.snake,
+                "outer": [{"device": a.device, "points": list(a.points),
+                           "settle_s": a.settle_s} for a in self.outer],
+                "shape": list(self.shape), "metadata": dict(self.metadata)}
 
     def validate(self, devices: Mapping[str, object]) -> None:
         dev = devices.get(self.device)
@@ -59,6 +95,8 @@ class FlyScan:
         for v in (self.start, self.stop):
             if not lo <= v <= hi:
                 raise PlanError(f"{self.device!r}: {v} outside limits [{lo}, {hi}]")
+        if self.outer:
+            Scan(self.outer).validate(devices)
         for r in self.readables:
             d = devices.get(r)
             if d is None or not hasattr(d, "read"):

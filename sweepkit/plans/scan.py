@@ -66,6 +66,18 @@ class Scan:
 
         yield from rec(0, ())
 
+    def estimate_time(self, read_s: float = 0.0, move_s: float = 0.0) -> float:
+        """Seconds, assuming each move costs `move_s` + the axis settle time and
+        each point costs `read_s`. Only axes whose setpoint changes are moved."""
+        total, prev = 0.0, {}
+        for _, _, sp in self.points():
+            moved = [a for a in self.axes if prev.get(a.device) != sp[a.device]]
+            if moved:
+                total += move_s + max(a.settle_s for a in moved)
+            total += read_s
+            prev = sp
+        return total
+
     def to_dict(self) -> dict:
         """JSON-able description of the plan (stored in the data file)."""
         return {"mode": "stepped", "axes": [{"device": a.device, "points": list(a.points),

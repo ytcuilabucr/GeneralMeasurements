@@ -91,7 +91,9 @@ class HDF5Sink:
         d = f.create_group("data")
         if fly:   # 1D streams: resizable, one row per sample
             p.attrs["shape"] = []
-            sp.create_dataset(rs.plan.device, shape=(0,), maxshape=(None,), dtype="f8")
+            for ax_name in rs.plan.axis_names:    # per-sample setpoint streams
+                sp.create_dataset(ax_name, shape=(0,), maxshape=(None,), dtype="f8")
+            d.create_dataset("ramp", shape=(0,), maxshape=(None,), dtype="i8")
             for name, info in rs.fields.items():
                 ds = d.create_dataset(name, shape=(0,) + tuple(info.shape),
                                       maxshape=(None,) + tuple(info.shape), dtype=info.dtype)
@@ -151,6 +153,8 @@ class HDF5Sink:
         d["timestamp"][-1] = ev.timestamp
         d["seq"].resize(n, axis=0)
         d["seq"][-1] = ev.seq
+        d["ramp"].resize(n, axis=0)
+        d["ramp"][-1] = ev.index[0]
 
     def _stop(self, st: RunStop) -> None:
         f = self._f

@@ -27,7 +27,8 @@ class StatusTracker:
     async def consume(self, sub) -> None:
         async for item in sub:
             if isinstance(item, RunStart):
-                total = math.prod(item.shape) if item.shape else None
+                stepped = getattr(item.plan, "mode", "stepped") == "stepped"
+                total = math.prod(item.shape) if stepped and item.shape else None
                 self.state.update(state="running", uid=item.uid, seq=None, total=total,
                                   reason="", last_note="")
             elif isinstance(item, Event):

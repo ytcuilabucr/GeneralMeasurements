@@ -12,6 +12,7 @@ class RetryPolicy:
     retries: int = 0                      # extra attempts per point
     on_exhausted: str = "abort"           # "abort" | "pause" (wait for operator)
     backoff_s: float = 0.0
+    point_timeout_s: float | None = None  # bound on move + settle + read of one point
     retry_on: tuple[type[BaseException], ...] = (TimeoutError, DriverError)
 
     def __post_init__(self):

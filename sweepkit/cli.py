@@ -1,6 +1,7 @@
-"""Command line: validate a station, run a plan file, control a running scan.
+"""Command line: validate a station, dry-run a plan, run it, control a running scan.
 
     sweepkit validate station.toml
+    sweepkit dry-run plans/iv.py --station station.toml [--read-s 0.5]
     sweepkit run plans/iv.py --station station.toml --out data --sample S1
     sweepkit ctl pause|resume|abort|status [reason] [--port 8765]
 
@@ -19,6 +20,7 @@ import logging
 import sys
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 
 def _load_plan(path: str):
@@ -31,41 +33,62 @@ def _load_plan(path: str):
 
 
 async def _run(args) -> int:
+    from .api import run_scan
     from .config import load_station
     from .config.registry import build_devices, close_devices
-    from .engine import Bus, Controller, LoopLagMonitor, run
-    from .engine.remote import ControlServer, StatusTracker
     from .provenance import collect
-    from .sinks import HDF5Sink, NotifySink, webhook_sender
+    from .sinks import NotifySink, webhook_sender
 
     cfg = load_station(args.station)
     mod = _load_plan(args.plan)
-    scan = mod.SCAN
     devices = await build_devices(cfg)
-    ctl, bus = Controller(), Bus()
-    tracker = StatusTracker(ctl)
-    server = ControlServer(ctl, tracker, args.host, args.port)
-    lag = LoopLagMonitor()
     out = Path(args.out) / f"{time.strftime('%Y%m%d_%H%M%S')}_{args.sample}.h5"
-    tasks = [asyncio.create_task(HDF5Sink(out).consume(bus.subscribe(policy="block"))),
-             asyncio.create_task(tracker.consume(bus.subscribe(policy="block")))]
+    sinks = []
     if args.webhook:
         notifier = NotifySink(webhook_sender(args.webhook), cfg.station.name)
-        tasks.append(asyncio.create_task(notifier.consume(bus.subscribe(policy="block"))))
+        sinks.append(("notify", notifier.consume))
     try:
-        await server.start()
-        lag.start()
-        print(f"control port {server.port}; writing {out}", flush=True)
-        stop = await run(scan, devices, bus, ctl, cfg.station.shutdown_order,
-                         provenance={**collect(args.station), "sample": args.sample},
-                         retry=getattr(mod, "RETRY", None))
-        await asyncio.gather(*tasks)
+        stop = await run_scan(
+            mod.SCAN, devices, out=out, shutdown_order=cfg.station.shutdown_order,
+            provenance={**collect(args.station), "sample": args.sample},
+            retry=getattr(mod, "RETRY", None), sinks=sinks,
+            serve_port=args.port, serve_host=args.host,
+            on_server_ready=lambda port: print(f"control port {port}; writing {out}",
+                                               flush=True))
         print(f"{stop.status}{': ' + stop.reason if stop.reason else ''}")
         return 0 if stop.status == "success" else 1
     finally:
-        await lag.stop()
-        await server.stop()
         await close_devices(devices)
+
+
+def _dry_run(args) -> int:
+    """Validate a plan against the station's configured limits and estimate its
+    duration. Builds stand-ins from the TOML only: no instrument is opened."""
+    from .config import load_station
+
+    cfg = load_station(args.station)
+    scan = _load_plan(args.plan).SCAN
+    stubs = {}
+    for name, d in cfg.devices.items():
+        attrs = {"read": None, "describe": lambda: {}}
+        if hasattr(d, "limits"):
+            attrs.update(set=None, limits=tuple(d.limits))
+            if d.driver == "sim_magnet":
+                attrs.update(start_ramp=None, ramp_done=None)
+        stubs[name] = SimpleNamespace(**attrs)
+    scan.validate(stubs)
+    print(f"plan ok: mode={scan.mode}, shape={tuple(scan.shape)}, "
+          f"axes={list(scan.axis_names)}")
+    if scan.mode == "stepped":
+        est = scan.estimate_time(read_s=args.read_s, move_s=args.move_s)
+        print(f"points: {scan.n_points}")
+    else:
+        est = scan.estimate_time(move_s=args.move_s)
+        print(f"ramps: {scan.n_ramps}, ramp time each: {scan.duration_s:.1f} s")
+    h, rem = divmod(est, 3600)
+    print(f"estimated duration: {int(h)} h {int(rem // 60)} min {rem % 60:.0f} s "
+          f"(read_s={args.read_s}, move_s={args.move_s})")
+    return 0
 
 
 async def _ctl(args) -> int:
@@ -86,6 +109,12 @@ def main(argv: list[str] | None = None) -> int:
 
     v = sub.add_parser("validate", help="validate a station TOML (touches no hardware)")
     v.add_argument("station")
+
+    d = sub.add_parser("dry-run", help="validate a plan and estimate its duration (no hardware)")
+    d.add_argument("plan")
+    d.add_argument("--station", required=True)
+    d.add_argument("--read-s", type=float, default=0.0, help="seconds per point for reads")
+    d.add_argument("--move-s", type=float, default=0.0, help="seconds per move (excl. settle)")
 
     r = sub.add_parser("run", help="run a plan file")
     r.add_argument("plan")
@@ -109,6 +138,8 @@ def main(argv: list[str] | None = None) -> int:
         cfg = load_station(args.station)
         print(f"ok: station {cfg.station.name!r}, devices: {', '.join(cfg.devices)}")
         return 0
+    if args.cmd == "dry-run":
+        return _dry_run(args)
     return asyncio.run(_run(args) if args.cmd == "run" else _ctl(args))
 
 
