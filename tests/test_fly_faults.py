@@ -5,7 +5,7 @@ import pytest
 
 from sweepkit.devices.sim import Fault, FaultyDevice, SimLockin, SimMagnet, SimSource
 from sweepkit.engine import Bus, Controller, Event, RunStop, run
-from sweepkit.load import load
+from sweepkit import load
 from sweepkit.plans import Axis, FlyScan, PlanError, Scan, linear
 from sweepkit.sinks import HDF5Sink
 

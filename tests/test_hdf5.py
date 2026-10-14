@@ -6,7 +6,7 @@ import pytest
 
 from sweepkit.devices.sim import SimLockin, SimSource
 from sweepkit.engine import Bus, run
-from sweepkit.load import load
+from sweepkit import load
 from sweepkit.plans import Axis, PlanError, Scan, linear
 from sweepkit.provenance import collect
 from sweepkit.sinks import HDF5Sink, resume_point

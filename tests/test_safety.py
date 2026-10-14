@@ -11,7 +11,7 @@ from sweepkit.devices.sim import Fault, FaultyDevice, SimLockin, SimSource
 from sweepkit.engine import (Bus, Controller, Event, LoopLagMonitor, Note, RetryPolicy,
                              RunStop, compliance_watchdog, nan_watchdog, range_watchdog, run)
 from sweepkit.engine.remote import ControlServer, StatusTracker, send_command
-from sweepkit.load import load
+from sweepkit import load
 from sweepkit.plans import Axis, Scan, linear
 from sweepkit.sinks import HDF5Sink, NotifySink
 

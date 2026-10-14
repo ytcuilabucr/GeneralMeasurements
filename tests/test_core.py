@@ -9,7 +9,7 @@ from sweepkit.api import run_scan
 from sweepkit.devices.sim import Fault, FaultyDevice, SimLockin, SimMagnet, SimSource
 from sweepkit.engine import Bus, Controller, Event, RetryPolicy, RunStart, RunStop, run
 from sweepkit.engine.remote import send_command
-from sweepkit.load import load
+from sweepkit import load
 from sweepkit.plans import Axis, FlyScan, PlanError, Scan, linear
 
 
