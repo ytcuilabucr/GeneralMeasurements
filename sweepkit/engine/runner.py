@@ -132,6 +132,10 @@ async def run(scan, devices: Mapping[str, object], bus: Bus,
         await bus.publish(RunStart(uid, scan, scan.shape, fields,
                                    await _snapshots(devices),
                                    {**(provenance or {}), "start_seq": start_seq}))
+        for n in read_names:      # only devices this scan uses (e.g. outputs ON at 0)
+            prep = getattr(devices[n], 'prepare', None)
+            if prep:
+                await prep()
         if scan.mode == "fly":
             await fly_body(scan, devices, emit, controller)
         else:

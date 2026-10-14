@@ -95,6 +95,12 @@ class Keithley24xx:
         if self.d.legacy_format:
             await t.write(":FORM:ELEM VOLT,CURR")
 
+    async def prepare(self) -> None:
+        """Called by the runner before the first move: output ON at level 0."""
+        await self.t.write(f":SOUR:{self._src}:LEV 0")
+        self._level = 0.0
+        await self.output(True)
+
     async def output(self, on: bool) -> None:
         await self.t.write(f":OUTP {'ON' if on else 'OFF'}")
 

@@ -220,3 +220,16 @@ def test_cli_validate_and_run_sim(tmp_path, capsys):
     ds = load(files[0])
     assert ds.attrs["status"] == "success" and ds.attrs["provenance"]["sample"] == "T1"
     assert ds.sizes["gate"] == 5
+
+
+async def test_prepare_turns_output_on_only_for_devices_in_scan():
+    idn = {"*IDN?": "KEITHLEY,MODEL 2400", ":READ?": "0,0,0,0,0",
+           ":SENS:CURR:PROT:TRIP?": "0"}
+    ta, tb = FakeTransport(dict(idn)), FakeTransport(dict(idn))
+    kw = dict(limits=(-5, 5), max_rate=1000, step_dt=0.0005, settle_s=0)
+    a, b = Keithley24xx("a", ta, "2400", **kw), Keithley24xx("b", tb, "2400", **kw)
+    stop, _ = await _go(Scan((Axis("a", (0.0, 1.0)),)), {"a": a, "b": b})
+    assert stop.status == "success"
+    assert ":OUTP ON" in ta.log and ta.log.index(":OUTP ON") < ta.log.index(":SOUR:VOLT:LEV 1")
+    assert ta.log[-1] == ":OUTP OFF"
+    assert ":OUTP ON" not in tb.log        # unused device untouched by prepare
