@@ -48,8 +48,26 @@ async def _snapshots(devices: Mapping[str, object]) -> dict:
     return out
 
 
+def make_reader(devices: Mapping[str, object], retry: RetryPolicy):
+    """read(name) -> dict, bounded by the per-device / default read timeout.
+
+    A slow device raises TimeoutError naming it, which the retry policy then
+    handles like any other transient fault (retry, pause or abort)."""
+    async def read(name: str) -> dict:
+        t = retry.read_timeout_for(name)
+        coro = devices[name].read()
+        if t is None:
+            return await coro
+        try:
+            return await asyncio.wait_for(coro, t)
+        except TimeoutError:
+            raise TimeoutError(f"{name}: read exceeded {t:g} s") from None
+    return read
+
+
 async def _stepped_body(scan: Scan, devices, emit, note, controller: Controller,
-                        read_names: list[str], start_seq: int, retry: RetryPolicy) -> None:
+                        read_names: list[str], start_seq: int, retry: RetryPolicy,
+                        read) -> None:
     prev: dict[str, float] = {}
 
     async def acquire(sp) -> dict:
@@ -61,7 +79,7 @@ async def _stepped_body(scan: Scan, devices, emit, note, controller: Controller,
             if settle:
                 await asyncio.sleep(settle)
         prev = sp
-        results = await asyncio.gather(*(devices[n].read() for n in read_names))
+        results = await asyncio.gather(*(read(n) for n in read_names))
         data: dict = {}
         for r in results:
             data.update(r)
@@ -151,10 +169,10 @@ async def run(scan, devices: Mapping[str, object], bus: Bus,
                 await prep()
         # guard(): abort() cancels the body at once (e.g. mid-ramp), not at the next point
         if scan.mode == "fly":
-            body = fly_body(scan, devices, emit, controller)
+            body = fly_body(scan, devices, emit, controller, make_reader(devices, retry))
         else:
             body = _stepped_body(scan, devices, emit, note, controller, read_names,
-                                 start_seq, retry)
+                                 start_seq, retry, make_reader(devices, retry))
         await controller.guard(body)
         # a watchdog may have tripped on the very last point
         stop = (RunStop("aborted", controller.abort_reason)

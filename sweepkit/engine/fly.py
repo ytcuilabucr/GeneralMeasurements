@@ -29,8 +29,9 @@ def _readback(data: dict, name: str) -> float:
 
 async def fly_body(scan: FlyScan, devices: Mapping[str, object],
                    emit: Callable[[Event], Awaitable[None]],
-                   controller: Controller) -> None:
+                   controller: Controller, read=None) -> None:
     dev = devices[scan.device]
+    read = read or (lambda n: devices[n].read())
     # axis readbacks (outer axes too, F4) plus readables, read concurrently per sample
     names = list(dict.fromkeys((*scan.axis_names, *scan.readables)))
     loop = asyncio.get_running_loop()
@@ -62,7 +63,7 @@ async def fly_body(scan: FlyScan, devices: Mapping[str, object],
         while True:
             if controller.paused:
                 held_at = loop.time()
-                cur = _readback(await dev.read(), scan.device)
+                cur = _readback(await read(scan.device), scan.device)
                 await dev.start_ramp(cur, scan.rate)   # hold where we are
                 await controller.checkpoint()          # blocks; raises Aborted
                 await dev.start_ramp(stop, scan.rate)
@@ -72,7 +73,7 @@ async def fly_body(scan: FlyScan, devices: Mapping[str, object],
             await controller.checkpoint()
 
             done = await dev.ramp_done()           # before sampling: last sample is post-ramp
-            results = await asyncio.gather(*(devices[n].read() for n in names))
+            results = await asyncio.gather(*(read(n) for n in names))
             data: dict = {}
             for r in results:
                 data.update(r)

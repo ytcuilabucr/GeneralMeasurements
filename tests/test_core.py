@@ -193,3 +193,50 @@ async def test_run_scan_planerror_does_not_hang(tmp_path):
         await asyncio.wait_for(run_scan(
             Scan((Axis("g", (0.0, 99.0)),)), {"g": SimSource("g", limits=(-1, 1))},
             out=tmp_path / "x.h5"), 5)
+
+
+# -- per-device read timeouts ---------------------------------------------------
+async def test_read_timeout_names_slow_device_and_is_retried():
+    g = SimSource("g")
+    slow = FaultyDevice(SimLockin("li", g), [Fault("read", "delay", after=2, times=1, delay_s=5)])
+    fast = SimLockin("li2", g)
+    notes = []
+    bus = Bus()
+
+    async def grab(sub):
+        async for i in sub:
+            notes.append(i)
+    bus.add_sink("grab", grab, critical=False)
+    stop = await asyncio.wait_for(run(
+        Scan((Axis("g", linear(0, 1, 4)),), readables=("li", "li2")),
+        {"g": g, "li": slow, "li2": fast}, bus,
+        retry=RetryPolicy(retries=1, read_timeout_s=0.1)), 5)
+    await bus.join()
+    assert stop.status == "success"
+    msgs = [n.message for n in notes if hasattr(n, "message")]
+    assert any("li: read exceeded 0.1 s" in m and "retry 1/1" in m for m in msgs)
+
+
+async def test_per_device_timeout_overrides_default():
+    g = SimSource("g")
+    slow = FaultyDevice(SimLockin("li", g), [Fault("read", "delay", times=None, delay_s=0.2)])
+    # default 0.05 s would fail; this device is allowed 1 s
+    stop = await run(Scan((Axis("g", linear(0, 1, 3)),), readables=("li",)),
+                     {"g": g, "li": slow}, Bus(),
+                     retry=RetryPolicy(read_timeout_s=0.05, device_read_timeouts={"li": 1.0}))
+    assert stop.status == "success"
+    with pytest.raises(TimeoutError, match="li: read exceeded"):
+        await run(Scan((Axis("g", linear(0, 1, 3)),), readables=("li",)),
+                  {"g": SimSource("g"), "li": FaultyDevice(
+                      SimLockin("li", g), [Fault("read", "delay", times=None, delay_s=0.2)])},
+                  Bus(), retry=RetryPolicy(read_timeout_s=0.05))
+
+
+async def test_fly_read_timeout_fails_run_and_holds_field():
+    g, m = SimSource("g"), SimMagnet("B", max_rate=1.0)
+    li = FaultyDevice(SimLockin("li", g), [Fault("read", "delay", after=3, times=None, delay_s=5)])
+    with pytest.raises(TimeoutError, match="li: read exceeded"):
+        await run(FlyScan("B", 0, 1, rate=1.0, dt=0.01, readables=("li",)),
+                  {"g": g, "B": m, "li": li}, Bus(),
+                  retry=RetryPolicy(read_timeout_s=0.05))
+    assert m.safe
