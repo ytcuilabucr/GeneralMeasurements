@@ -6,6 +6,7 @@ dependencies = ["numpy", "h5py", "pydantic>=2", "pyvisa", "pyvisa-py"]
 
 [project.optional-dependencies]
 xarray = ["xarray"]
+plot = ["pyqtgraph", "PyQt6"]
 dev = ["xarray", "pytest", "pytest-asyncio", "ruff"]
 
 [project.scripts]

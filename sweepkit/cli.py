@@ -41,9 +41,17 @@ async def _run(args) -> int:
 
     cfg = load_station(args.station)
     mod = _load_plan(args.plan)
+    if args.plot is not None:       # fail fast, before any instrument is opened
+        from .sinks.liveplot import _require_pyqtgraph
+        _require_pyqtgraph()
     devices = await build_devices(cfg)
     out = Path(args.out) / f"{time.strftime('%Y%m%d_%H%M%S')}_{args.sample}.h5"
     sinks = []
+    if args.plot is not None:
+        from .sinks import LivePlotSink
+        fields = [f for f in args.plot.split(",") if f] or None
+        sinks.append(("liveplot", LivePlotSink(fields, args.plot_x, title=args.sample,
+                                               keep_open=args.plot_keep).consume))
     if args.webhook:
         notifier = NotifySink(webhook_sender(args.webhook), cfg.station.name)
         sinks.append(("notify", notifier.consume))
@@ -124,6 +132,11 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--host", default="127.0.0.1")
     r.add_argument("--port", type=int, default=8765)
     r.add_argument("--webhook", help="URL to POST notifications to")
+    r.add_argument("--plot", nargs="?", const="", metavar="FIELDS",
+                   help="live plot (comma-separated fields; default: first few)")
+    r.add_argument("--plot-x", help="x axis for the live plot (axis name or data field)")
+    r.add_argument("--plot-keep", action="store_true",
+                   help="leave the plot window open after the run")
 
     c = sub.add_parser("ctl", help="pause/resume/abort/status of a running scan")
     c.add_argument("command", choices=["pause", "resume", "abort", "status"])

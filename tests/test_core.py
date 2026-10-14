@@ -243,13 +243,14 @@ async def test_fly_read_timeout_fails_run_and_holds_field():
 
 
 # -- fly-mode sample-miss policy -------------------------------------------------
-def _fly_skip(**kw):
-    return FlyScan("B", 0, 1, rate=1.0, dt=0.01, readables=("li",), on_sample_error="skip", **kw)
+def _fly_skip(rate=1.0, dt=0.01, **kw):
+    return FlyScan("B", 0, 1, rate=rate, dt=dt, readables=("li",),
+                   on_sample_error="skip", **kw)
 
 
 async def test_fly_skip_policy_continues_and_notes_gaps():
-    g, m = SimSource("g"), SimMagnet("B", max_rate=1.0)
-    li = FaultyDevice(SimLockin("li", g), [Fault("read", "timeout", after=5, times=2)])
+    g, m = SimSource("g"), SimMagnet("B", max_rate=2.0)
+    li = FaultyDevice(SimLockin("li", g), [Fault("read", "timeout", after=4, times=2)])
     items = []
     bus = Bus()
 
@@ -257,7 +258,8 @@ async def test_fly_skip_policy_continues_and_notes_gaps():
         async for i in sub:
             items.append(i)
     bus.add_sink("grab", grab, critical=False)
-    stop = await run(_fly_skip(max_skips=3), {"g": g, "B": m, "li": li}, bus)
+    stop = await run(_fly_skip(rate=2.0, dt=0.05, max_skips=3),
+                     {"g": g, "B": m, "li": li}, bus)
     await bus.join()
     assert stop.status == "success"
     evs = [i for i in items if isinstance(i, Event)]
