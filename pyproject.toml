@@ -2,10 +2,11 @@
 name = "sweepkit"
 version = "0.0.1"
 requires-python = ">=3.12"
-dependencies = ["numpy", "pydantic>=2", "pyvisa", "pyvisa-py"]
+dependencies = ["numpy", "h5py", "pydantic>=2", "pyvisa", "pyvisa-py"]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio", "ruff"]
+xarray = ["xarray"]
+dev = ["xarray", "pytest", "pytest-asyncio", "ruff"]
 
 [build-system]
 requires = ["hatchling"]

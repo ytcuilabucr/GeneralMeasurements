@@ -60,6 +60,13 @@ class Scan:
 
         yield from rec(0, ())
 
+    def to_dict(self) -> dict:
+        """JSON-able description of the plan (stored in the data file)."""
+        return {"axes": [{"device": a.device, "points": list(a.points),
+                          "settle_s": a.settle_s, "snake": a.snake} for a in self.axes],
+                "readables": list(self.readables), "shape": list(self.shape),
+                "metadata": dict(self.metadata)}
+
     def validate(self, devices: Mapping[str, object]) -> None:
         """Check roles exist and every setpoint is inside device limits.
         Called before any hardware moves."""

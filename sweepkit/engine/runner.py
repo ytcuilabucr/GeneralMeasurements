@@ -42,7 +42,9 @@ async def _snapshots(devices: Mapping[str, object]) -> dict:
 
 async def run(scan: Scan, devices: Mapping[str, object], bus: Bus,
               controller: Controller | None = None,
-              shutdown_order: list[str] | None = None) -> RunStop:
+              shutdown_order: list[str] | None = None,
+              provenance: Mapping | None = None,
+              start_seq: int = 0) -> RunStop:
     controller = controller or Controller()
     scan.validate(devices)            # PlanError here: nothing has moved yet
     uid = uuid.uuid4().hex[:12]
@@ -58,9 +60,12 @@ async def run(scan: Scan, devices: Mapping[str, object], bus: Bus,
     error: BaseException | None = None
     try:
         await bus.publish(RunStart(uid, scan, scan.shape, fields,
-                                   await _snapshots(devices), dict(scan.metadata)))
+                                   await _snapshots(devices),
+                                   {**(provenance or {}), "start_seq": start_seq}))
         prev: dict[str, float] = {}
         for seq, idx, sp in scan.points():
+            if seq < start_seq:   # resume: skip completed points
+                continue
             await controller.checkpoint()
             moved = [a for a in scan.axes if prev.get(a.device) != sp[a.device]]
             if moved:
