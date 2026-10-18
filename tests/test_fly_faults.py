@@ -3,11 +3,11 @@ import asyncio
 import numpy as np
 import pytest
 
-from sweepkit.devices.sim import Fault, FaultyDevice, SimLockin, SimMagnet, SimSource
-from sweepkit.engine import Bus, Controller, Event, RunStop, run
-from sweepkit import load
-from sweepkit.plans import Axis, FlyScan, PlanError, Scan, linear
-from sweepkit.sinks import HDF5Sink
+from generalmeasurements.devices.sim import Fault, FaultyDevice, SimLockin, SimMagnet, SimSource
+from generalmeasurements.engine import Bus, Controller, Event, RunStop, run
+from generalmeasurements import load
+from generalmeasurements.plans import Axis, FlyScan, PlanError, Scan, linear
+from generalmeasurements.sinks import HDF5Sink
 
 
 async def _collect(sub):
@@ -85,7 +85,7 @@ async def test_fly_pause_holds_then_resumes():
     await asyncio.sleep(0.1)
     assert m.value == v and 0 < v < 1
     ctl.resume()
-    stop, items = await asyncio.wait_for(task, 5)
+    stop, _items = await asyncio.wait_for(task, 5)
     assert stop.status == "success" and m.value == pytest.approx(1.0)
 
 

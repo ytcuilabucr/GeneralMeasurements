@@ -4,12 +4,12 @@ import h5py
 import numpy as np
 import pytest
 
-from sweepkit.devices.sim import SimLockin, SimSource
-from sweepkit.engine import Bus, run
-from sweepkit import load
-from sweepkit.plans import Axis, PlanError, Scan, linear
-from sweepkit.provenance import collect
-from sweepkit.sinks import HDF5Sink, resume_point
+from generalmeasurements.devices.sim import SimLockin, SimSource
+from generalmeasurements.engine import Bus, run
+from generalmeasurements import load
+from generalmeasurements.plans import Axis, Scan, linear
+from generalmeasurements.provenance import collect
+from generalmeasurements.sinks import HDF5Sink, resume_point
 
 
 def _station():
@@ -40,7 +40,7 @@ async def test_file_layout_and_load(tmp_path):
         assert f["data/li.x"].shape == (3, 4)
         assert f["data/li.x"].attrs["units"] == "V"
         assert (f["data/seq"][...] >= 0).all()
-        assert f["provenance"].attrs["sweepkit_version"]
+        assert f["provenance"].attrs["generalmeasurements_version"]
     ds = load(p)
     assert ds["li.x"].dims == ("b", "g") and ds.sizes == {"b": 3, "g": 4}
     assert ds["g_readback"].shape == (3, 4)          # axis readback kept

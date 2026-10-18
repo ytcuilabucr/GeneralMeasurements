@@ -2,9 +2,9 @@ import asyncio
 
 import pytest
 
-from sweepkit.devices.sim import SimLockin, SimSource
-from sweepkit.engine import Bus, Controller, Event, RunStart, RunStop, run
-from sweepkit.plans import Axis, PlanError, Scan, linear
+from generalmeasurements.devices.sim import SimLockin, SimSource
+from generalmeasurements.engine import Bus, Controller, Event, RunStart, RunStop, run
+from generalmeasurements.plans import Axis, PlanError, Scan, linear
 
 
 def test_snake_2d_path_is_continuous():

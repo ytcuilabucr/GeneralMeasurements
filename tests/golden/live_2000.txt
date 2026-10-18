@@ -1,0 +1,139 @@
+# --- tests/test_live_keithley.py::test_k2000_idn_and_bad_command
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2000,1273646,A20  /A02    (18 ms)
+> *CLS
+> :BOGUS:CMD 1
+? :SYST:ERR?
+< -113,"Undefined header"    (26 ms)
+? :SYST:ERR?
+< 0,"No error"    (12 ms)
+? :SYST:ERR?
+< 0,"No error"    (11 ms)
+# --- tests/test_live_keithley.py::test_k2000_configure_and_read[volt]
+> *CLS
+> :INIT:CONT OFF
+> :SENS:FUNC 'VOLT:DC'
+> :SENS:VOLT:DC:NPLC 1
+> :SENS:VOLT:DC:RANG:AUTO ON
+? :SYST:ERR?
+< 0,"No error"    (2110 ms)
+? :SENS:FUNC?
+< "VOLT:DC"    (15 ms)
+? :READ?
+< +5.88670672E+00    (42 ms)
+? :READ?
+< +5.86225978E+00    (41 ms)
+? :READ?
+< +5.83895161E+00    (41 ms)
+? :READ?
+< +5.81572316E+00    (41 ms)
+? :READ?
+< +5.79230571E+00    (41 ms)
+# volt readings: [5.88670672, 5.86225978, 5.83895161, 5.81572316, 5.79230571]
+? :SYST:ERR?
+< 0,"No error"    (15 ms)
+# --- tests/test_live_keithley.py::test_k2000_configure_and_read[res]
+> *CLS
+> :INIT:CONT OFF
+> :SENS:FUNC 'RES'
+> :SENS:RES:NPLC 1
+> :SENS:RES:RANG:AUTO ON
+? :SYST:ERR?
+< 0,"No error"    (551 ms)
+? :SENS:FUNC?
+< "RES"    (14 ms)
+? :READ?
+< +9.9E37    (43 ms)
+? :READ?
+< +9.9E37    (41 ms)
+? :READ?
+< +9.9E37    (41 ms)
+? :READ?
+< +9.9E37    (42 ms)
+? :READ?
+< +9.9E37    (41 ms)
+# res readings: [9.9e+37, 9.9e+37, 9.9e+37, 9.9e+37, 9.9e+37]
+? :SYST:ERR?
+< 0,"No error"    (10 ms)
+# --- tests/test_live_keithley.py::test_k2000_configure_and_read[fres]
+> *CLS
+> :INIT:CONT OFF
+> :SENS:FUNC 'FRES'
+> :SENS:FRES:NPLC 1
+> :SENS:FRES:RANG:AUTO ON
+? :SYST:ERR?
+< 0,"No error"    (549 ms)
+? :SENS:FUNC?
+< "FRES"    (14 ms)
+? :READ?
+< +9.9E37    (61 ms)
+? :READ?
+< +9.9E37    (61 ms)
+? :READ?
+< +9.9E37    (61 ms)
+? :READ?
+< +9.9E37    (61 ms)
+? :READ?
+< +9.9E37    (62 ms)
+# fres readings: [9.9e+37, 9.9e+37, 9.9e+37, 9.9e+37, 9.9e+37]
+? :SYST:ERR?
+< 0,"No error"    (10 ms)
+# --- tests/test_live_keithley.py::test_k2000_read_timing_by_nplc
+> *CLS
+> :INIT:CONT OFF
+> :SENS:FUNC 'VOLT:DC'
+> :SENS:VOLT:DC:NPLC 0.1
+> :SENS:VOLT:DC:RANG 10
+? :SYST:ERR?
+< 0,"No error"    (127 ms)
+? :READ?
+< +7.10583078E+00    (41 ms)
+# :READ? at NPLC 0.1: 41 ms
+> *CLS
+> :INIT:CONT OFF
+> :SENS:FUNC 'VOLT:DC'
+> :SENS:VOLT:DC:NPLC 1
+> :SENS:VOLT:DC:RANG 10
+? :SYST:ERR?
+< 0,"No error"    (297 ms)
+? :READ?
+< +6.87706849E+00    (37 ms)
+# :READ? at NPLC 1: 37 ms
+> *CLS
+> :INIT:CONT OFF
+> :SENS:FUNC 'VOLT:DC'
+> :SENS:VOLT:DC:NPLC 10
+> :SENS:VOLT:DC:RANG 10
+? :SYST:ERR?
+< 0,"No error"    (1899 ms)
+? :READ?
+< +5.66623369E+00    (531 ms)
+# :READ? at NPLC 10: 531 ms
+? :SYST:ERR?
+< 0,"No error"    (10 ms)
+# --- tests/test_live_keithley.py::test_k2000_timeout_then_next_query_in_sync
+> *CLS
+> :INIT:CONT OFF
+> :SENS:FUNC 'VOLT:DC'
+> :SENS:VOLT:DC:NPLC 10
+> :SENS:VOLT:DC:RANG 10
+? :SYST:ERR?
+< 0,"No error"    (42 ms)
+> :SENS:VOLT:DC:AVER:COUN 10
+> :SENS:VOLT:DC:AVER:STAT ON
+? :READ?
+! TimeoutError after 0.270 s
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2000,1273646,A20  /A02    (17 ms)
+# first query after timeout returned: 'KEITHLEY INSTRUMENTS INC.,MODEL 2000,1273646,A20  /A02'
+> :SENS:VOLT:DC:AVER:STAT OFF
+# --- tests/test_live_keithley.py::test_k2000_left_in_fres
+> *CLS
+> :INIT:CONT OFF
+> :SENS:FUNC 'FRES'
+> :SENS:FRES:NPLC 1
+> :SENS:FRES:RANG:AUTO ON
+? :SYST:ERR?
+< 0,"No error"    (753 ms)
+? :SENS:FUNC?
+< "FRES"    (14 ms)

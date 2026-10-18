@@ -1,0 +1,37 @@
+# Giga-tronics 2420B microwave signal generator.
+#
+# The scan axis is a mode: in gigatronics_2420b_freq.toml the station's
+# limits apply to the frequency, in gigatronics_2420b_power.toml to the
+# power. The power is always capped at max_power_dbm.
+
+drivers = ["gigatronics_2420b"]
+label = "Giga-tronics 2420B"
+mode_attr = "axis"
+modes = { freq = "Frequency axis", power = "Power axis" }
+safe = "RF OFF"
+groups = ["Output"]
+
+[properties.rf]
+kind = "bool"
+access = "both"
+group = "Output"
+label = "RF"
+get = "output_state"
+set = "output"
+confirm = "Turn RF ON at {power}?"     # {property} = its present value
+confirm_when = [true]
+
+[properties.freq]
+access = "both"
+group = "Output"
+label = "{name} CW frequency"
+unit = "Hz"
+set = "set_freq"
+
+[properties.power]
+access = "both"
+group = "Output"
+label = "{name} output level"
+unit = "dBm"
+set = "set_power"
+max = "max_power_dbm"

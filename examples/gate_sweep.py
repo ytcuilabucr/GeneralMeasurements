@@ -1,9 +1,9 @@
 """2D snake scan on the simulated station:
-    sweepkit run examples/gate_sweep.py --station station.sim.toml --sample demo
+    gm run examples/gate_sweep.py --station station.sim.toml --sample demo
 """
 
-from sweepkit.engine import RetryPolicy, range_watchdog
-from sweepkit.plans import Axis, Scan, linear
+from generalmeasurements.engine import RetryPolicy, range_watchdog
+from generalmeasurements.plans import Axis, Scan, linear
 
 SCAN = Scan(
     axes=(Axis("bias", linear(0.0, 0.5, 3)),

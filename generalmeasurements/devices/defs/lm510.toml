@@ -1,0 +1,56 @@
+# Cryomagnetics LM-510 liquid cryogen level meter, one channel.
+#
+# read() only fetches the last measured level; each measurement heats the
+# sensor and boils off helium, so measuring is an explicit action.
+
+drivers = ["lm510"]
+label = "Cryomagnetics LM-510, channel {channel}"
+safe = "Nothing to make safe: a level meter only measures"
+groups = ["Measurement", "Meter"]
+
+[properties.level]
+key = ""
+label = "{name} level (channel {channel})"
+unit = "{units}"
+
+[properties.mode]
+kind = "enum"
+access = "both"
+group = "Measurement"
+label = "Mode"
+choices = { "Sample/Hold" = "sample/hold", Continuous = "continuous" }
+get = "mode"
+set = "set_mode"
+
+[properties.interval]
+access = "both"
+group = "Measurement"
+label = "Sample/Hold interval"
+unit = "s"
+get = "interval_s"
+set = "set_interval"
+limits = [1.0, 359999.0]
+
+[properties.low]
+group = "Meter"
+label = "Low mark"
+unit = "{units}"
+get = "snapshot.low"
+
+[properties.high]
+group = "Meter"
+label = "High mark"
+unit = "{units}"
+get = "snapshot.high"
+
+[properties.length]
+kind = "str"
+group = "Meter"
+label = "Sensor length"
+get = "snapshot.length"
+
+[properties.measure]
+kind = "action"
+label = "Measure now"
+set = "measure"
+tooltip = "Start one measurement (heats the sensor)"

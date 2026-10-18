@@ -1,0 +1,23 @@
+# Keithley 24xx sourcing current: the level is in A and reads back as `i`;
+# the compliance limits the voltage.
+
+mode = "curr"
+info = "Sources current. Compliance {compliance:g} V; limits {limits[0]:g} … {limits[1]:g} A; max rate {max_rate:g} A/s."
+
+[properties.level]
+access = "both"
+group = "Source"
+label = "Current level"
+unit = "A"
+get = "programmed_level"
+set = "set"                        # ramps at max_rate, then settles
+readback = "i"
+limits = "limits"
+ramp = { max_rate = "max_rate", unit = "A/s" }
+stoppable = true
+
+[properties.compliance]
+group = "Source"
+label = "Voltage compliance"
+unit = "V"
+get = "compliance"

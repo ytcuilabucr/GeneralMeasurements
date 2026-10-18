@@ -1,0 +1,60 @@
+# Lake Shore 625 superconducting magnet supply.
+#
+# The axis is the current in A, or the field in T when the station gives
+# tesla_per_amp (`units` is then "T"). That is a unit conversion, not an
+# instrument mode, so there are no mode files. The driver never writes the
+# persistent-switch heater or the supply's limits.
+
+drivers = ["lakeshore_625"]
+label = "Lake Shore 625 magnet supply"
+info = "Limits {limits[0]:g} … {limits[1]:g} {units}; max rate {max_rate:g} {units}/s."
+safe = "Hold the present current (never ramps the magnet down)"
+groups = ["Ramp", "Supply"]
+
+[properties.output]
+key = ""
+label = "{name} {quantity}"
+unit = "{units}"
+
+[properties.v]
+label = "{name} output voltage"
+unit = "V"
+
+[properties.i]
+label = "{name} output current"
+unit = "A"
+when = "k"                         # only when the axis is the field
+
+[properties.target]
+access = "both"
+group = "Ramp"
+label = "Target"
+unit = "{units}"
+get = "target"
+readback = "output"
+limits = "limits"
+ramp = { max_rate = "max_rate", unit = "{units}/s", start = "start_ramp", stop = "hold" }
+confirm = "Ramp {name} to {value}?"
+
+[properties.switch_heater]
+kind = "bool"
+group = "Supply"
+label = "Persistent switch heater (read only)"
+get = "switch_heater_on"
+
+[properties.supply_limits]
+kind = "str"
+group = "Supply"
+label = "Supply limits (A, V, A/s)"
+get = "snapshot.limit"
+
+[properties.errors]
+kind = "str"
+group = "Supply"
+label = "Error status"
+get = "snapshot.erst"
+
+[properties.hold]
+kind = "action"
+label = "Hold"
+set = "hold"

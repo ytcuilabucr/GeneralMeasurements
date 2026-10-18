@@ -1,24 +1,50 @@
 [project]
-name = "sweepkit"
+name = "GeneralMeasurements"
 version = "0.0.1"
 requires-python = ">=3.12"
 dependencies = ["numpy", "h5py", "pydantic>=2", "pyvisa", "pyvisa-py"]
 
 [project.optional-dependencies]
 xarray = ["xarray"]
-plot = ["pyqtgraph", "PyQt6"]
-dev = ["xarray", "pytest", "pytest-asyncio", "ruff"]
+plot = ["pyqtgraph", "PySide6-Essentials"]
+gui = ["GeneralMeasurements[plot]", "PySide6-QtAds"]
+dev = ["xarray", "pytest", "pytest-asyncio", "ruff", "pyright"]
 
 [project.scripts]
-sweepkit = "sweepkit.cli:main"
+gm = "generalmeasurements.cli:main"
+generalmeasurements = "generalmeasurements.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["sweepkit"]
+packages = ["generalmeasurements"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+# Explicit list so a ruff upgrade can't change what CI enforces.
+select = ["E4", "E7", "E9", "F", "UP", "ASYNC", "RUF"]
+ignore = [
+    "RUF022",    # __all__ is grouped by hand
+    "RUF100",    # keep BLE001 markers on deliberate broad excepts
+    "RUF005",    # tuple concatenation reads fine for index building
+    "RUF007",    # zip(xs, xs[1:]) is fine
+    "ASYNC109",  # timeout parameter on the control client is deliberate
+    "ASYNC110",  # sims poll ramp_done() the way real Rampables are polled
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ASYNC251"]  # the loop-lag test blocks the loop on purpose
+
+[tool.pyright]
+include = ["generalmeasurements"]
+typeCheckingMode = "standard"
+pythonVersion = "3.12"

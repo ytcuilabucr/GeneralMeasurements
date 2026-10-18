@@ -1,0 +1,9 @@
+# Keithley 2000 measuring 2-wire resistance.
+
+mode = "res"
+
+[properties.reading]
+unit = "Ohm"
+
+[properties.range]
+unit = "Ohm"

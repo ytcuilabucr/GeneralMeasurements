@@ -1,11 +1,9 @@
-import asyncio
-
 import numpy as np
 
-from sweepkit.devices.sim import SimLockin, SimMagnet, SimSource
-from sweepkit.engine import Bus, run
-from sweepkit.plans import Axis, FlyScan, Scan, linear
-from sweepkit.sinks import LivePlotSink, PlotBuffer
+from generalmeasurements.devices.sim import SimLockin, SimMagnet, SimSource
+from generalmeasurements.engine import Bus, run
+from generalmeasurements.plans import Axis, FlyScan, Scan, linear
+from generalmeasurements.sinks import LivePlotSink, PlotBuffer
 
 
 class FakeChannel:

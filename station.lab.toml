@@ -1,0 +1,71 @@
+# The instruments found on the lab PC's GPIB bus (scan of 2026-10-16).
+# Values marked CHECK are placeholders: set them from the sample and magnet specs
+# before running anything on real hardware.
+
+[station]
+name = "lab-gpib"
+# Sources first (to zero), then RF off; the magnet and temperature hold.
+shutdown_order = ["bias", "gate", "rf", "magnet", "temp"]
+
+[devices.gate]                     # Keithley 2400, output was OFF at scan time
+driver = "keithley_24xx"
+model = "2400"
+resource = "GPIB0::26::INSTR"
+compliance = 1e-6                  # CHECK
+limits = [-1.0, 1.0]               # CHECK
+max_rate = 0.1
+
+[devices.bias]                     # Keithley 2401, was sourcing 1.05 uA at scan time
+driver = "keithley_24xx"
+model = "2401"
+resource = "GPIB0::22::INSTR"
+mode = "curr"
+compliance = 0.2                   # V, the value set on the unit at scan time
+limits = [-2e-6, 2e-6]             # CHECK
+max_rate = 1e-6
+# To let the GUI switch bias to sourcing voltage (Switch mode…), give that
+# function's settings:
+# [devices.bias.modes.volt]
+# compliance = 1e-6                # A, CHECK
+# limits = [-1.0, 1.0]             # V, CHECK
+# max_rate = 0.1                   # V/s
+
+[devices.dmm]                      # Keithley 2000, was in 4-wire resistance mode
+driver = "keithley_2000"
+resource = "GPIB0::11::INSTR"
+function = "fres"
+nplc = 1
+
+[devices.lockin]
+driver = "sr850"
+resource = "GPIB0::8::INSTR"
+
+[devices.temp]                     # Lake Shore 335
+driver = "lakeshore_335"
+resource = "GPIB0::1::INSTR"
+input = "A"                        # loop 1 was set to control input B at scan time;
+loop = 1                           # configure() refuses until they match
+limits = [2.0, 300.0]
+max_rate = 0.0333                  # K/s (2 K/min, the unit's ramp setting at scan time)
+
+[devices.magnet]                   # Lake Shore 625
+driver = "lakeshore_625"
+resource = "GPIB0::12::INSTR"
+limits = [-10.0, 10.0]             # A; CHECK against the magnet (supply limit is 49.6 A)
+max_rate = 0.035                   # A/s, the unit's rate setting at scan time
+# tesla_per_amp = 0.1              # CHECK: set to sweep in tesla
+# persistent_switch = true         # CHECK: if the magnet has a switch
+
+[devices.helium]                   # Cryomagnetics LM-510 behind a Digi serial-LAN adapter
+driver = "lm510"                   # (single client: one session at a time). The meter
+resource = "TCPIP0::192.168.1.51::4266::SOCKET"   # had not answered as of 2026-10-17
+channel = 1
+units = "in"
+
+[devices.rf]                       # Giga-tronics 2420B, RF was OFF at scan time
+driver = "gigatronics_2420b"
+resource = "GPIB0::6::INSTR"
+axis = "freq"
+limits = [1e9, 2e10]
+power_dbm = -20.0                  # CHECK
+max_power_dbm = 0.0

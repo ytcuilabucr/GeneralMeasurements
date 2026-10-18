@@ -1,0 +1,9 @@
+# Keithley 2000 measuring DC current.
+
+mode = "curr"
+
+[properties.reading]
+unit = "A"
+
+[properties.range]
+unit = "A"

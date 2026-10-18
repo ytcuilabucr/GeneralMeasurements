@@ -1,19 +1,17 @@
 import asyncio
-import json
-import sys
 
 import numpy as np
 import pytest
 
-from sweepkit import cli
-from sweepkit.devices import FakeTransport, Keithley24xx
-from sweepkit.devices.sim import Fault, FaultyDevice, SimLockin, SimSource
-from sweepkit.engine import (Bus, Controller, Event, LoopLagMonitor, Note, RetryPolicy,
-                             RunStop, compliance_watchdog, nan_watchdog, range_watchdog, run)
-from sweepkit.engine.remote import ControlServer, StatusTracker, send_command
-from sweepkit import load
-from sweepkit.plans import Axis, Scan, linear
-from sweepkit.sinks import HDF5Sink, NotifySink
+from generalmeasurements import cli
+from generalmeasurements.devices import FakeTransport, Keithley24xx
+from generalmeasurements.devices.sim import Fault, FaultyDevice, SimLockin, SimSource
+from generalmeasurements.engine import (Bus, Controller, Event, LoopLagMonitor, Note, RetryPolicy,
+                             compliance_watchdog, nan_watchdog, range_watchdog, run)
+from generalmeasurements.engine.remote import ControlServer, StatusTracker, send_command
+from generalmeasurements import load
+from generalmeasurements.plans import Axis, Scan, linear
+from generalmeasurements.sinks import HDF5Sink, NotifySink
 
 
 async def _collect(sub):
@@ -123,7 +121,8 @@ async def test_pause_issues_no_instrument_commands():
     bus = Bus()
     sub = bus.subscribe(policy="block")
     task = asyncio.create_task(run(Scan((Axis("g", linear(0, 1, 30)),)), {"g": k}, bus, ctl))
-    await sub.get(); await sub.get()
+    await sub.get()
+    await sub.get()
     ctl.pause()
     await asyncio.sleep(0.1)                   # let the in-flight point finish
     n = len(t.log)
@@ -210,7 +209,7 @@ def test_cli_validate_and_run_sim(tmp_path, capsys):
     assert cli.main(["validate", "station.sim.toml"]) == 0
     plan = tmp_path / "plan.py"
     plan.write_text(
-        "from sweepkit.plans import Axis, Scan, linear\n"
+        "from generalmeasurements.plans import Axis, Scan, linear\n"
         "SCAN = Scan((Axis('gate', linear(-1, 1, 5)),), readables=('lockin',))\n")
     rc = cli.main(["run", str(plan), "--station", "station.sim.toml", "--out", str(tmp_path),
                    "--sample", "T1", "--port", "0"])

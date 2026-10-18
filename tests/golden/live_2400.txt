@@ -1,0 +1,361 @@
+# --- tests/test_live_keithley.py::test_smu_idn_and_clean_queue[2400]
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2400,0917134,C24   Feb 14 2002 11:59:45/A02  /K/H    (13 ms)
+> *CLS
+? :SYST:ERR?
+< 0,"No error"    (7 ms)
+# --- tests/test_live_keithley.py::test_smu_bad_command_is_reported[2400]
+> *CLS
+> :BOGUS:CMD 1
+? :SYST:ERR?
+< -113,"Undefined header"    (14 ms)
+? :SYST:ERR?
+< 0,"No error"    (6 ms)
+? :SYST:ERR?
+< 0,"No error"    (6 ms)
+# --- tests/test_live_keithley.py::test_smu_configure_applies_settings[2400]
+> *RST
+> *CLS
+> :SOUR:FUNC VOLT
+> :SOUR:VOLT:MODE FIX
+> :SOUR:VOLT:LEV 0
+> :SENS:CURR:PROT 1e-06
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:CURR:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (77 ms)
+? :OUTP?
+< 0    (5 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SENS:CURR:PROT?
+< 1.000000E-06    (9 ms)
+? :SENS:CURR:NPLC?
+< 1.00    (8 ms)
+? :FORM:ELEM?
+< VOLT,CURR    (6 ms)
+# --- tests/test_live_keithley.py::test_smu_ramp_with_output_off[2400]
+> *RST
+> *CLS
+> :SOUR:FUNC VOLT
+> :SOUR:VOLT:MODE FIX
+> :SOUR:VOLT:LEV 0
+> :SENS:CURR:PROT 1e-06
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:CURR:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (78 ms)
+> :SOUR:VOLT:LEV 0.02
+> :SOUR:VOLT:LEV 0.04
+> :SOUR:VOLT:LEV 0.06
+> :SOUR:VOLT:LEV 0.08
+> :SOUR:VOLT:LEV 0.1
+> :SOUR:VOLT:LEV 0.1
+? :SOUR:VOLT:LEV?
+< 1.000000E-01    (12 ms)
+? :OUTP?
+< 0    (5 ms)
+> :SOUR:VOLT:LEV 0.08
+> :SOUR:VOLT:LEV 0.06
+> :SOUR:VOLT:LEV 0.04
+> :SOUR:VOLT:LEV 0.02
+> :SOUR:VOLT:LEV -6.93889e-18
+> :SOUR:VOLT:LEV -0.02
+> :SOUR:VOLT:LEV -0.04
+> :SOUR:VOLT:LEV -0.06
+> :SOUR:VOLT:LEV -0.08
+> :SOUR:VOLT:LEV -0.1
+? :SOUR:VOLT:LEV?
+< -1.000000E-01    (14 ms)
+? :OUTP?
+< 0    (5 ms)
+> :SOUR:VOLT:LEV -0.08
+> :SOUR:VOLT:LEV -0.06
+> :SOUR:VOLT:LEV -0.04
+> :SOUR:VOLT:LEV -0.02
+> :SOUR:VOLT:LEV 0
+? :SOUR:VOLT:LEV?
+< 0.000000E+00    (14 ms)
+? :OUTP?
+< 0    (5 ms)
+? :SYST:ERR?
+< 0,"No error"    (7 ms)
+> :SOUR:VOLT:LEV 0
+> :OUTP OFF
+# --- tests/test_live_keithley.py::test_smu_read_with_output_off_fails_fast[2400]
+> *RST
+> *CLS
+> :SOUR:FUNC VOLT
+> :SOUR:VOLT:MODE FIX
+> :SOUR:VOLT:LEV 0
+> :SENS:CURR:PROT 1e-06
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:CURR:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (78 ms)
+? :SYST:ERR?
+< 0,"No error"    (7 ms)
+# --- tests/test_live_keithley.py::test_smu_raw_read_timeout_recovers[2400]
+> *RST
+> *CLS
+> :SOUR:FUNC VOLT
+> :SOUR:VOLT:MODE FIX
+> :SOUR:VOLT:LEV 0
+> :SENS:CURR:PROT 1e-06
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:CURR:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (82 ms)
+? :READ?
+! TimeoutError after 1.054 s
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2400,0917134,C24   Feb 14 2002 11:59:45/A02  /K/H    (13 ms)
+> *CLS
+? :SYST:ERR?
+< 0,"No error"    (7 ms)
+# --- tests/test_live_keithley.py::test_smu_compliance_query_and_snapshot[2400]
+> *RST
+> *CLS
+> :SOUR:FUNC VOLT
+> :SOUR:VOLT:MODE FIX
+> :SOUR:VOLT:LEV 0
+> :SENS:CURR:PROT 1e-06
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:CURR:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (78 ms)
+? :SENS:CURR:PROT:TRIP?
+< 0    (9 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2400,0917134,C24   Feb 14 2002 11:59:45/A02  /K/H    (12 ms)
+? :SYST:ERR?
+< 0,"No error"    (6 ms)
+# --- tests/test_live_keithley.py::test_smu_burst_queries[2400]
+> *RST
+> *CLS
+> :SOUR:FUNC VOLT
+> :SOUR:VOLT:MODE FIX
+> :SOUR:VOLT:LEV 0
+> :SENS:CURR:PROT 1e-06
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:CURR:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (77 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (7 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+? :SOUR:FUNC?
+< VOLT    (6 ms)
+# 50 x :SOUR:FUNC?: mean 6.2 ms
+# --- tests/test_live_keithley.py::test_smu_concurrent_queries_stay_paired[2400]
+> *RST
+> *CLS
+> :SOUR:FUNC VOLT
+> :SOUR:VOLT:MODE FIX
+> :SOUR:VOLT:LEV 0
+> :SENS:CURR:PROT 1e-06
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:CURR:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (73 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2400,0917134,C24   Feb 14 2002 11:59:45/A02  /K/H    (12 ms)
+? :SOUR:FUNC?
+< VOLT    (19 ms)
+? :OUTP?
+< 0    (24 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2400,0917134,C24   Feb 14 2002 11:59:45/A02  /K/H    (36 ms)
+? :SOUR:FUNC?
+< VOLT    (43 ms)
+? :OUTP?
+< 0    (47 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2400,0917134,C24   Feb 14 2002 11:59:45/A02  /K/H    (60 ms)
+? :SOUR:FUNC?
+< VOLT    (66 ms)
+? :OUTP?
+< 0    (71 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2400,0917134,C24   Feb 14 2002 11:59:45/A02  /K/H    (83 ms)
+? :SOUR:FUNC?
+< VOLT    (90 ms)
+? :OUTP?
+< 0    (95 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2400,0917134,C24   Feb 14 2002 11:59:45/A02  /K/H    (108 ms)
+? :SOUR:FUNC?
+< VOLT    (114 ms)
+? :OUTP?
+< 0    (120 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2400,0917134,C24   Feb 14 2002 11:59:45/A02  /K/H    (132 ms)
+? :SOUR:FUNC?
+< VOLT    (138 ms)
+? :OUTP?
+< 0    (142 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2400,0917134,C24   Feb 14 2002 11:59:45/A02  /K/H    (155 ms)
+? :SOUR:FUNC?
+< VOLT    (161 ms)
+? :OUTP?
+< 0    (166 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2400,0917134,C24   Feb 14 2002 11:59:45/A02  /K/H    (179 ms)
+? :SOUR:FUNC?
+< VOLT    (185 ms)
+? :OUTP?
+< 0    (190 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2400,0917134,C24   Feb 14 2002 11:59:45/A02  /K/H    (202 ms)
+? :SOUR:FUNC?
+< VOLT    (208 ms)
+? :OUTP?
+< 0    (212 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2400,0917134,C24   Feb 14 2002 11:59:45/A02  /K/H    (225 ms)
+? :SOUR:FUNC?
+< VOLT    (231 ms)
+? :OUTP?
+< 0    (237 ms)
+# --- tests/test_live_keithley.py::test_smu_cancelled_query_keeps_session_in_sync[2400]
+? :OUTP?
+< 0    (5 ms)
+? :OUTP?
+< 0    (5 ms)
+? :OUTP?
+< 0    (5 ms)
+? :OUTP?
+< 0    (5 ms)
+? :OUTP?
+< 0    (5 ms)
+# --- tests/test_live_keithley.py::test_smu_safe_state[2400]
+> *RST
+> *CLS
+> :SOUR:FUNC VOLT
+> :SOUR:VOLT:MODE FIX
+> :SOUR:VOLT:LEV 0
+> :SENS:CURR:PROT 1e-06
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:CURR:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (83 ms)
+> :SOUR:VOLT:LEV 0.02
+> :SOUR:VOLT:LEV 0.04
+> :SOUR:VOLT:LEV 0.06
+> :SOUR:VOLT:LEV 0.08
+> :SOUR:VOLT:LEV 0.1
+> :SOUR:VOLT:LEV 0.1
+> :SOUR:VOLT:LEV 0.08
+> :SOUR:VOLT:LEV 0.06
+> :SOUR:VOLT:LEV 0.04
+> :SOUR:VOLT:LEV 0.02
+> :SOUR:VOLT:LEV 0
+> :OUTP OFF
+? :SOUR:VOLT:LEV?
+< 0.000000E+00    (12 ms)
+? :OUTP?
+< 0    (5 ms)

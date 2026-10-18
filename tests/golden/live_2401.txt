@@ -1,0 +1,361 @@
+# --- tests/test_live_keithley.py::test_smu_idn_and_clean_queue[2401]
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2401,4607664,B02 Jan 20 2021 10:19:49/B01  /W/N    (9 ms)
+> *CLS
+? :SYST:ERR?
+< 0,"No error"    (6 ms)
+# --- tests/test_live_keithley.py::test_smu_bad_command_is_reported[2401]
+> *CLS
+> :BOGUS:CMD 1
+? :SYST:ERR?
+< -113,"Undefined header"    (6 ms)
+? :SYST:ERR?
+< 0,"No error"    (6 ms)
+? :SYST:ERR?
+< 0,"No error"    (6 ms)
+# --- tests/test_live_keithley.py::test_smu_configure_applies_settings[2401]
+> *RST
+> *CLS
+> :SOUR:FUNC CURR
+> :SOUR:CURR:MODE FIX
+> :SOUR:CURR:LEV 0
+> :SENS:VOLT:PROT 0.2
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:VOLT:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (44 ms)
+? :OUTP?
+< 0    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SENS:VOLT:PROT?
+< 2.000000E-01    (6 ms)
+? :SENS:VOLT:NPLC?
+< 1.00    (6 ms)
+? :FORM:ELEM?
+< VOLT,CURR    (6 ms)
+# --- tests/test_live_keithley.py::test_smu_ramp_with_output_off[2401]
+> *RST
+> *CLS
+> :SOUR:FUNC CURR
+> :SOUR:CURR:MODE FIX
+> :SOUR:CURR:LEV 0
+> :SENS:VOLT:PROT 0.2
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:VOLT:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (44 ms)
+> :SOUR:CURR:LEV 2e-08
+> :SOUR:CURR:LEV 4e-08
+> :SOUR:CURR:LEV 6e-08
+> :SOUR:CURR:LEV 8e-08
+> :SOUR:CURR:LEV 1e-07
+? :SOUR:CURR:LEV?
+< 1.000000E-07    (6 ms)
+? :OUTP?
+< 0    (5 ms)
+> :SOUR:CURR:LEV 8e-08
+> :SOUR:CURR:LEV 6e-08
+> :SOUR:CURR:LEV 4e-08
+> :SOUR:CURR:LEV 2e-08
+> :SOUR:CURR:LEV 6.61744e-24
+> :SOUR:CURR:LEV -2e-08
+> :SOUR:CURR:LEV -4e-08
+> :SOUR:CURR:LEV -6e-08
+> :SOUR:CURR:LEV -8e-08
+> :SOUR:CURR:LEV -1e-07
+? :SOUR:CURR:LEV?
+< -1.000000E-07    (6 ms)
+? :OUTP?
+< 0    (5 ms)
+> :SOUR:CURR:LEV -8e-08
+> :SOUR:CURR:LEV -6e-08
+> :SOUR:CURR:LEV -4e-08
+> :SOUR:CURR:LEV -2e-08
+> :SOUR:CURR:LEV -6.61744e-24
+> :SOUR:CURR:LEV 0
+? :SOUR:CURR:LEV?
+< 0.000000E+00    (6 ms)
+? :OUTP?
+< 0    (5 ms)
+? :SYST:ERR?
+< 0,"No error"    (6 ms)
+> :SOUR:CURR:LEV 0
+> :OUTP OFF
+# --- tests/test_live_keithley.py::test_smu_read_with_output_off_fails_fast[2401]
+> *RST
+> *CLS
+> :SOUR:FUNC CURR
+> :SOUR:CURR:MODE FIX
+> :SOUR:CURR:LEV 0
+> :SENS:VOLT:PROT 0.2
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:VOLT:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (44 ms)
+? :SYST:ERR?
+< 0,"No error"    (6 ms)
+# --- tests/test_live_keithley.py::test_smu_raw_read_timeout_recovers[2401]
+> *RST
+> *CLS
+> :SOUR:FUNC CURR
+> :SOUR:CURR:MODE FIX
+> :SOUR:CURR:LEV 0
+> :SENS:VOLT:PROT 0.2
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:VOLT:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (45 ms)
+? :READ?
+! TimeoutError after 1.056 s
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2401,4607664,B02 Jan 20 2021 10:19:49/B01  /W/N    (9 ms)
+> *CLS
+? :SYST:ERR?
+< 0,"No error"    (6 ms)
+# --- tests/test_live_keithley.py::test_smu_compliance_query_and_snapshot[2401]
+> *RST
+> *CLS
+> :SOUR:FUNC CURR
+> :SOUR:CURR:MODE FIX
+> :SOUR:CURR:LEV 0
+> :SENS:VOLT:PROT 0.2
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:VOLT:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (44 ms)
+? :SENS:VOLT:PROT:TRIP?
+< 0    (6 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2401,4607664,B02 Jan 20 2021 10:19:49/B01  /W/N    (9 ms)
+? :SYST:ERR?
+< 0,"No error"    (6 ms)
+# --- tests/test_live_keithley.py::test_smu_burst_queries[2401]
+> *RST
+> *CLS
+> :SOUR:FUNC CURR
+> :SOUR:CURR:MODE FIX
+> :SOUR:CURR:LEV 0
+> :SENS:VOLT:PROT 0.2
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:VOLT:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (44 ms)
+? :SOUR:FUNC?
+< CURR    (6 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (6 ms)
+? :SOUR:FUNC?
+< CURR    (6 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (6 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (6 ms)
+? :SOUR:FUNC?
+< CURR    (6 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+? :SOUR:FUNC?
+< CURR    (5 ms)
+# 50 x :SOUR:FUNC?: mean 5.5 ms
+# --- tests/test_live_keithley.py::test_smu_concurrent_queries_stay_paired[2401]
+> *RST
+> *CLS
+> :SOUR:FUNC CURR
+> :SOUR:CURR:MODE FIX
+> :SOUR:CURR:LEV 0
+> :SENS:VOLT:PROT 0.2
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:VOLT:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (44 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2401,4607664,B02 Jan 20 2021 10:19:49/B01  /W/N    (10 ms)
+? :SOUR:FUNC?
+< CURR    (15 ms)
+? :OUTP?
+< 0    (21 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2401,4607664,B02 Jan 20 2021 10:19:49/B01  /W/N    (30 ms)
+? :SOUR:FUNC?
+< CURR    (36 ms)
+? :OUTP?
+< 0    (41 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2401,4607664,B02 Jan 20 2021 10:19:49/B01  /W/N    (51 ms)
+? :SOUR:FUNC?
+< CURR    (56 ms)
+? :OUTP?
+< 0    (61 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2401,4607664,B02 Jan 20 2021 10:19:49/B01  /W/N    (70 ms)
+? :SOUR:FUNC?
+< CURR    (76 ms)
+? :OUTP?
+< 0    (81 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2401,4607664,B02 Jan 20 2021 10:19:49/B01  /W/N    (93 ms)
+? :SOUR:FUNC?
+< CURR    (100 ms)
+? :OUTP?
+< 0    (107 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2401,4607664,B02 Jan 20 2021 10:19:49/B01  /W/N    (119 ms)
+? :SOUR:FUNC?
+< CURR    (125 ms)
+? :OUTP?
+< 0    (130 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2401,4607664,B02 Jan 20 2021 10:19:49/B01  /W/N    (139 ms)
+? :SOUR:FUNC?
+< CURR    (145 ms)
+? :OUTP?
+< 0    (150 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2401,4607664,B02 Jan 20 2021 10:19:49/B01  /W/N    (159 ms)
+? :SOUR:FUNC?
+< CURR    (165 ms)
+? :OUTP?
+< 0    (170 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2401,4607664,B02 Jan 20 2021 10:19:49/B01  /W/N    (179 ms)
+? :SOUR:FUNC?
+< CURR    (185 ms)
+? :OUTP?
+< 0    (190 ms)
+? *IDN?
+< KEITHLEY INSTRUMENTS INC.,MODEL 2401,4607664,B02 Jan 20 2021 10:19:49/B01  /W/N    (199 ms)
+? :SOUR:FUNC?
+< CURR    (206 ms)
+? :OUTP?
+< 0    (213 ms)
+# --- tests/test_live_keithley.py::test_smu_cancelled_query_keeps_session_in_sync[2401]
+? :OUTP?
+< 0    (5 ms)
+? :OUTP?
+< 0    (5 ms)
+? :OUTP?
+< 0    (5 ms)
+? :OUTP?
+< 0    (5 ms)
+? :OUTP?
+< 0    (5 ms)
+# --- tests/test_live_keithley.py::test_smu_safe_state[2401]
+> *RST
+> *CLS
+> :SOUR:FUNC CURR
+> :SOUR:CURR:MODE FIX
+> :SOUR:CURR:LEV 0
+> :SENS:VOLT:PROT 0.2
+> :SENS:FUNC "VOLT","CURR"
+> :SENS:VOLT:NPLC 1
+> :FORM:ELEM VOLT,CURR
+? :SYST:ERR?
+< 0,"No error"    (45 ms)
+> :SOUR:CURR:LEV 2e-08
+> :SOUR:CURR:LEV 4e-08
+> :SOUR:CURR:LEV 6e-08
+> :SOUR:CURR:LEV 8e-08
+> :SOUR:CURR:LEV 1e-07
+> :SOUR:CURR:LEV 8e-08
+> :SOUR:CURR:LEV 6e-08
+> :SOUR:CURR:LEV 4e-08
+> :SOUR:CURR:LEV 2e-08
+> :SOUR:CURR:LEV 6.61744e-24
+> :SOUR:CURR:LEV 0
+> :OUTP OFF
+? :SOUR:CURR:LEV?
+< 0.000000E+00    (6 ms)
+? :OUTP?
+< 0    (5 ms)

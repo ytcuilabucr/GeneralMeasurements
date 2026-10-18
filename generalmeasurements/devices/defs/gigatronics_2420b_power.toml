@@ -1,0 +1,7 @@
+# Giga-tronics 2420B swept in power at a fixed frequency.
+
+mode = "power"
+info = "Scan axis: power, {limits[0]:g} … {limits[1]:g} dBm. Power cap {max_power_dbm:g} dBm."
+
+[properties.power]
+limits = "limits"

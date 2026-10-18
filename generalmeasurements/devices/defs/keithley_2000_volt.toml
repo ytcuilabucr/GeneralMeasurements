@@ -1,0 +1,9 @@
+# Keithley 2000 measuring DC volts.
+
+mode = "volt"
+
+[properties.reading]
+unit = "V"
+
+[properties.range]
+unit = "V"

@@ -1,4 +1,4 @@
-# sweepkit
+# GeneralMeasurements
 
 A small asyncio sweep engine for the lab: any instrument that implements the
 Movable/Readable contract can be swept or read, so a new measurement is a
@@ -15,7 +15,8 @@ hardware yet** (see [adapter pages](docs/adapters/)).
 python -m venv .venv
 .venv\Scripts\activate           # Linux: source .venv/bin/activate
 pip install -e ".[dev]"          # core + xarray + pytest
-pip install -e ".[plot]"         # optional: live plot (pyqtgraph + PyQt6)
+pip install -e ".[plot]"         # optional: live plot (pyqtgraph + PySide6)
+pip install -e ".[gui]"          # optional: instrument windows (+ PySide6-QtAds)
 pytest                           # ~7 s, no hardware needed
 ```
 
@@ -28,9 +29,9 @@ Python 3.12+. Real instruments additionally need a VISA backend (NI-VISA, or
 is a 2D snake scan (bias outer, gate inner) reading a lock-in.
 
 ```
-sweepkit validate station.sim.toml
-sweepkit dry-run examples/gate_sweep.py --station station.sim.toml --read-s 0.2
-sweepkit run     examples/gate_sweep.py --station station.sim.toml --out data --sample demo
+gm validate station.sim.toml
+gm dry-run examples/gate_sweep.py --station station.sim.toml --read-s 0.2
+gm run     examples/gate_sweep.py --station station.sim.toml --out data --sample demo
 ```
 
 - `validate` checks the TOML with pydantic and touches no hardware; a typo in a
@@ -42,22 +43,31 @@ sweepkit run     examples/gate_sweep.py --station station.sim.toml --out data --
 While a run is going, from another terminal:
 
 ```
-sweepkit ctl status            # state, seq / total, last note
-sweepkit ctl pause             # holds at the next point; ramps are held in place
-sweepkit ctl resume
-sweepkit ctl abort too noisy   # interrupts a move in progress, then safe shutdown
+gm ctl status            # state, seq / total, last note
+gm ctl pause             # holds at the next point; ramps are held in place
+gm ctl resume
+gm ctl abort too noisy   # interrupts a move in progress, then safe shutdown
 ```
 
-Live plot (needs the `plot` extra): `sweepkit run ... --plot lockin.x`
+Live plot (needs the `plot` extra): `gm run ... --plot lockin.x`
 (comma-separated fields; `--plot-x` picks the x axis; `--plot-keep` leaves the
 window open). The window is a separate process: it can lag or crash without
 touching the measurement.
 
+Instrument control windows (needs the `gui` extra): `gm gui --station
+station.sim.toml`. There is one window per instrument type (Keithley,
+Temperature, Magnet, ...), and same-type instruments are docked together in it.
+Each instrument has a live readout and its essential controls. Connecting never
+resets an instrument; see [docs/gui.md](docs/gui.md).
+
+The CLI is `gm` (long form `generalmeasurements`); the package is
+`import generalmeasurements`.
+
 Read the data back:
 
 ```python
-import sweepkit
-ds = sweepkit.load("data/20261013_223826_demo.h5")   # xarray.Dataset
+import generalmeasurements
+ds = generalmeasurements.load("data/20261013_223826_demo.h5")   # xarray.Dataset
 ds["lockin.x"].plot()                                # dims (bias, gate)
 ds.attrs["status"], ds.attrs["provenance"]["git_commit"]
 ```
@@ -71,8 +81,8 @@ A plan file defines `SCAN` (and optionally `RETRY`); devices are referred to by
 station role name only.
 
 ```python
-from sweepkit.engine import RetryPolicy, compliance_watchdog, range_watchdog
-from sweepkit.plans import Axis, FlyScan, Scan, linear
+from generalmeasurements.engine import RetryPolicy, compliance_watchdog, range_watchdog
+from generalmeasurements.plans import Axis, FlyScan, Scan, linear
 
 # stepped, nested, snake: only axes whose setpoint changed are moved
 SCAN = Scan(
@@ -96,7 +106,7 @@ RETRY = RetryPolicy(retries=2, on_exhausted="pause", read_timeout_s=5,
 From a script instead of the CLI:
 
 ```python
-stop = await sweepkit.run_scan(scan, devices, out="run.h5",
+stop = await generalmeasurements.run_scan(scan, devices, out="run.h5",
                                shutdown_order=["gate", "bias"], serve_port=8765)
 ```
 
@@ -115,19 +125,23 @@ stop = await sweepkit.run_scan(scan, devices, out="run.h5",
    `safe_state()` on all devices in `shutdown_order`, each bounded by a
    timeout, then writes an honest final status. A killed process leaves
    `status="running"`; resume it with `HDF5Sink(path, resume=True)` and
-   `start_seq=sweepkit.sinks.resume_point(path)` (stepped scans).
+   `start_seq=generalmeasurements.sinks.resume_point(path)` (stepped scans).
 
 ## Layout
 
 ```
-sweepkit/
-  devices/   protocols.py, transport.py, sim.py, keithley_24xx.py, keithley_2000.py, srs_lockin.py
+generalmeasurements/
+  devices/   protocols.py, transport.py, sim.py, definitions.py, keithley_24xx.py,
+             keithley_2000.py, srs_lockin.py, lakeshore_335.py, lakeshore_625.py,
+             gigatronics_2420b.py, lm510.py
+    defs/    one TOML definition per driver (one per mode where a mode changes units)
   plans/     axes.py, scan.py (stepped), fly.py (FlyScan)
   engine/    runner.py, fly.py, bus.py, control.py, safety.py, retry.py, remote.py, events.py
   sinks/     hdf5.py, liveplot.py, notify.py
   config/    schema.py (pydantic), registry.py
+  gui/       app.py (station + instrument windows), panels.py, worker.py
   api.py  cli.py  dataset.py  provenance.py
-docs/        adapters/*.md, adding-an-adapter.md
+docs/        adapters/*.md, adding-an-adapter.md, definitions.md, gui.md
 examples/    gate_sweep.py
 ```
 

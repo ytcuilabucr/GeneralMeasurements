@@ -1,0 +1,9 @@
+# Keithley 2000 measuring 4-wire resistance.
+
+mode = "fres"
+
+[properties.reading]
+unit = "Ohm"
+
+[properties.range]
+unit = "Ohm"

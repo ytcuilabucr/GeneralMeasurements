@@ -60,7 +60,7 @@ Five layers, each talking only to its neighbours: devices know hardware, plans a
 Config builds the devices and the plan drives the runner; sinks and watchdogs only ever see events, so adding an output or a safety check never touches the runner.
 
 ```
-sweepkit/
+generalmeasurements/
   devices/   protocols.py, sim.py, <one module per instrument>
   plans/     axes.py (linear/log/list/snake), scan.py
   engine/    runner.py, fly.py, events.py, bus.py, control.py, safety.py
@@ -120,13 +120,13 @@ One HDF5 file per run, laid out on the scan grid so it opens directly in Python 
   /data/timestamp, /data/seq
   /setpoints/<axis>  1D point lists
   /snapshot     attrs per device: settings at run start
-  /provenance   station TOML text, sweepkit version, git commit, Python and package versions, host, user
+  /provenance   station TOML text, GeneralMeasurements version, git commit, Python and package versions, host, user
   /log          watchdog trips, pauses, retries, operator notes
 ```
 
 - Fly-mode runs store data as 1D streams (`/data/<field>` with shape `(n,) + field_shape`), since the point count isn't known in advance.
 - `schema_version` is bumped on any layout change; readers check it.
-- A small `sweepkit.load(path)` returns an `xarray.Dataset` with axes as coordinates and units as attributes.
+- A small `generalmeasurements.load(path)` returns an `xarray.Dataset` with axes as coordinates and units as attributes.
 - Naming convention for files and samples is decided once and enforced by the writer (see open questions).
 
 ## Configuration and instrument inventory
@@ -139,47 +139,52 @@ name = "cryostat-A"
 shutdown_order = ["gate", "bias", "magnet"]
 
 [devices.gate]
-driver = "k24xx_source"
+driver = "keithley_24xx"
+model = "2400"
 resource = "GPIB0::24::INSTR"
-compliance_a = 1e-9
+compliance = 1e-9          # A in volt mode, V in curr mode
 limits = [-10.0, 10.0]
-max_rate_v_per_s = 0.5
+max_rate = 0.5             # V/s (A/s), enforced inside set()
 
 [devices.vxx]
-driver = "agilent344xx_voltmeter"
-resource = "USB0::0x2A8D::0x1301::MY123::INSTR"
+driver = "keithley_2000"
+resource = "GPIB0::16::INSTR"
 nplc = 10
 ```
 
 Plans live in separate TOML or Python files and refer to devices by role name only.
 
-**Instrument inventory (to fill in)**
+**Instrument inventory** (status as of 2026-10-16). GPIB addresses are from a bus scan of the lab PC; `station.lab.toml` lists them. "Comms verified" = live tests pass with outputs off; "queries only" = reply formats read from the instrument, writes not yet sent.
 
 | Role | Instrument | Interface | Contract | Python library | Adapter status |
 | --- | --- | --- | --- | --- | --- |
-| Voltage source | Keithley 2400 | GPIB | Movable | pyvisa | Not started |
-| Voltmeter | Keithley 2410 | GPIB | Readable | pyvisa | Not started |
-| Voltmeter | Agilent DMM (model?) | USB/LAN | Readable | pyvisa | Not started |
-| Magnet supply | ? | ? | Rampable | ? | Not started |
-| Temperature controller | ? | ? | Rampable | ? | Not started |
-| Lock-in | ? | ? | Readable | ? | Not started |
+| Voltage source | Keithley 2400 (GPIB 26) | GPIB | Movable | pyvisa | `keithley_24xx`; **comms verified**; output-on read not yet tested |
+| Current source | Keithley 2401 (GPIB 22) | GPIB | Movable | pyvisa | `keithley_24xx` (`mode = "curr"`); **comms verified** |
+| Voltage source | Keithley 2410 / 2450 | GPIB | Movable | pyvisa | `keithley_24xx`; not on the bus, unverified |
+| Voltmeter | Keithley 2000 DMM (GPIB 11) | GPIB | Readable | pyvisa | `keithley_2000`; **comms verified** |
+| Voltmeter | Agilent DMM (model?) | USB/LAN | Readable | pyvisa | Not started; not found on GPIB |
+| Magnet supply | Lake Shore 625 (GPIB 12) | GPIB | Rampable | pyvisa | `lakeshore_625`; queries only |
+| Temperature controller | Lake Shore 335 (GPIB 1) | GPIB | Rampable | pyvisa | `lakeshore_335`; queries only |
+| Lock-in | SRS SR850 (GPIB 8) | GPIB | Readable | pyvisa | `sr850`; `*IDN?` only; no overload detection |
+| Microwave source | Giga-tronics 2420B (GPIB 6) | GPIB | Movable | pyvisa | `gigatronics_2420b`; queries only |
 | Monochromator / laser | ? | ? | Movable | ? | Not started |
+| Unknown | GPIB 3, 4 | GPIB | ? | ? | Listed by the bus scan but no reply to `*IDN?` or serial poll |
 
 ## Development phases
 
 Build the whole pipeline on simulated hardware first (phases 0 to 2), then add real instruments one at a time; each phase ends with a check you can run.
 
-| Phase | Deliverables | Done when |
-| --- | --- | --- |
-| 0. Foundations | Repo, uv project, ruff, pyright, pytest, CI; protocols module; config schema skeleton | CI green on an empty test suite; a sample station TOML validates |
-| 1. Core on simulators | Sim devices (magnet with real ramp time, DMM returning f(setpoints), noisy lock-in); axes and point iterator; Scan validation; stepped runner; bus; controller | A 2D snake scan on sims runs end to end; abort mid-scan triggers safe\_state; out-of-limit plans are rejected before any move |
-| 2. Data and provenance | HDF5 sink, provenance capture, `sweepkit.load()`, resume from last point | Killing the process mid-run leaves a readable file with status; resume finishes it; the file opens in Igor and xarray |
-| 3. First real instruments | Keithley 24xx source and voltmeter adapters, Agilent DMM adapter, per-adapter hardware tests | I-V on a known resistor matches Ohm's law within instrument spec; swapping the voltmeter needs only a TOML edit |
-| 4. Safety and control | Ramp-rate enforcement, watchdogs, shutdown order, CLI pause/resume/abort, notifier sink | Compliance trip aborts the run and ramps gates to zero; pause holds state for 30 min and resumes cleanly |
-| 5. Slow axes and fly mode | Magnet and temperature controller adapters (Rampable), fly runner, readback recording | A field fly sweep and a stepped temperature series both produce correct files |
-| 6. Optical axis and arrays | Monochromator/laser adapter, array Readable (spectrometer or camera) | A wavelength sweep stores a spectrum per point with correct shape |
-| 7. Usability | Live plot, dry run with time estimate, user guide, example plans, remote control hook | A labmate runs a new measurement from the guide without help |
-| 8. Later | Adaptive sweeps, hardware-timed buffered acquisition, run browser | Scoped separately |
+| Phase | Deliverables | Done when | Status (2026-10-16) |
+| --- | --- | --- | --- |
+| 0. Foundations | Repo, uv project, ruff, pyright, pytest, CI; protocols module; config schema skeleton | CI green on an empty test suite; a sample station TOML validates | **Mostly done.** CI runs ruff, pytest and station validation on Windows and Linux; pyright is report-only (55 errors in standard mode, not yet strict). No uv lockfile or pre-commit yet. |
+| 1. Core on simulators | Sim devices (magnet with real ramp time, DMM returning f(setpoints), noisy lock-in); axes and point iterator; Scan validation; stepped runner; bus; controller | A 2D snake scan on sims runs end to end; abort mid-scan triggers safe\_state; out-of-limit plans are rejected before any move | **Done** (covered by tests). |
+| 2. Data and provenance | HDF5 sink, provenance capture, `generalmeasurements.load()`, resume from last point | Killing the process mid-run leaves a readable file with status; resume finishes it; the file opens in Igor and xarray | **Done on sims** except the Igor check, not yet tried. |
+| 3. First real instruments | Keithley 24xx source and voltmeter adapters, Agilent DMM adapter, per-adapter hardware tests | I-V on a known resistor matches Ohm's law within instrument spec; swapping the voltmeter needs only a TOML edit | **In progress.** Communication with the 2400, 2401 and 2000 verified on hardware (live tests, golden transcripts; four comms bugs found and fixed). No Agilent adapter. Ohm's-law check (output on, dummy resistor) not run. |
+| 4. Safety and control | Ramp-rate enforcement, watchdogs, shutdown order, CLI pause/resume/abort, notifier sink | Compliance trip aborts the run and ramps gates to zero; pause holds state for 30 min and resumes cleanly | **Done on sims/fakes.** Not checked on hardware; 30-min pause not tested. |
+| 5. Slow axes and fly mode | Magnet and temperature controller adapters (Rampable), fly runner, readback recording | A field fly sweep and a stepped temperature series both produce correct files | **Partial.** Fly runner, readback and sim magnet done. Lake Shore 625 and 335 adapters written (read-only checks, queries verified); no write sent to either yet. SR830/SR850 lock-in adapters written early. |
+| 6. Optical axis and arrays | Monochromator/laser adapter, array Readable (spectrometer or camera) | A wavelength sweep stores a spectrum per point with correct shape | Not started. |
+| 7. Usability | Live plot, dry run with time estimate, user guide, example plans, remote control hook | A labmate runs a new measurement from the guide without help | **Mostly done.** Live plot, dry run, README quickstart, adapter pages, one example plan, localhost control server. Labmate test not done. |
+| 8. Later | Adaptive sweeps, hardware-timed buffered acquisition, run browser | Scoped separately | Not started (by design). |
 
 ## Testing strategy
 
@@ -242,3 +247,13 @@ The costliest failures are a damaged sample and silently wrong data, so most mit
 | 2026-10-13 | Build our own engine with a Movable/Readable contract instead of QCoDeS or Bluesky | Existing asyncio drivers; full control of concurrency and safety; lab-scale scope |
 | 2026-10-13 | TOML + pydantic for station config | Stdlib reader, comments allowed, validation before hardware is touched |
 | 2026-10-13 | HDF5, one file per run, laid out on the scan grid | Opens in Python and Igor; arrays and metadata in one file |
+| 2026-10-16 | pyright runs in CI as report-only, in standard mode; strict for `devices/`, `engine/`, `plans/` comes later | Existing code has ~55 standard and ~300 strict errors, nearly all typing gaps (untyped h5py/pyvisa, devices typed as `object`), not bugs; blocking CI on them would stall other work |
+| 2026-10-16 | Lake Shore 625 and 335 adapters never write the switch heater, limits, PID or control input; `configure()` only checks them | These are cryostat-wide settings owned by the operator; a wrong write can quench the magnet or warm the sample |
+| 2026-10-16 | The VISA transport device-clears on every timeout and raises `TimeoutError` | A late reply was otherwise read by the next query (seen on hardware), and retries need a clean session |
+| 2026-10-16 | Add a simple instrument control window (one Qt app, a tabbed dock per instrument) | Manual control and monitoring between scans; narrows the "no full GUI" non-goal rather than reversing it: no scan editing or data browsing. It reuses the drivers, so limits and ramp rates still apply |
+| 2026-10-16 | Ruff rule set pinned explicitly in `pyproject.toml` (no import sorting) | Ruff's defaults change between releases; keeps CI stable and the existing compact import style |
+| 2026-10-17 | Cryostat instruments (temperature, magnet, helium) get panels with their own layout, modelled on the legacy LabVIEW VIs. Each panel is its own module in `gui/instruments/`, not inside the driver file | Drivers are imported by headless scans, `gm validate` and CI, which must not need Qt. Limits and safety stay in one reviewable place that the GUI can only call into. A one-to-one file naming keeps each panel next to its driver in the tree |
+| 2026-10-17 | The LS625 panel leaves out the legacy VI's persistent-switch sequencing, and the LS335 panel leaves out Set PID | Same rule as the drivers: the switch heater, PID and limits are operator-owned. Revisit only with an explicit, reviewed procedure |
+| 2026-10-17 | Rename the project to GeneralMeasurements: import package `generalmeasurements`, CLI `gm` | Matches the repository name. The import package is lowercase, per PEP 8 |
+| 2026-10-17 | GUI on PySide6 + Qt Advanced Docking System. One window per instrument type, with same-type instruments docked together; a station window for the overview | Instruments of different kinds sit on different parts of the screen (or different monitors), while similar ones (the Keithleys) can be compared side by side. QtAds gives splitting, floating and saved layouts, which QDockWidget does not handle well across several windows. PySide6 is the official binding (LGPL) and the one QtAds ships wheels for |
+| 2026-10-17 | Driver properties are declared in TOML definitions (`devices/defs/`), after Labber's `.ini` but with maps instead of numbered keys and explicit rate units. A setting that changes other properties' units or roles is a mode, with one definition file per mode; the mode is fixed while connected, and the driver's `switch_mode()` changes it | One standard panel and `describe()` come from a declarative list, so new instruments need no GUI code. One file per mode keeps every file flat (fixed units and limits) instead of per-mode conditionals inside each property. Switching through the driver keeps the safety sequence (ramp to 0, output off, reconfigure) in one place |
