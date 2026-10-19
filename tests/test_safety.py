@@ -1,17 +1,16 @@
 import asyncio
 
-import numpy as np
 import pytest
 
-from generalmeasurements import cli
-from generalmeasurements.devices import FakeTransport, Keithley24xx
-from generalmeasurements.devices.sim import Fault, FaultyDevice, SimLockin, SimSource
-from generalmeasurements.engine import (Bus, Controller, Event, LoopLagMonitor, Note, RetryPolicy,
+from gmcore import cli
+from gmcore.devices import FakeTransport, Keithley2400
+from gmcore.devices.sim import Fault, FaultyDevice, SimLockin, SimSource
+from gmcore.engine import (Bus, Controller, Event, LoopLagMonitor, Note, RetryPolicy,
                              compliance_watchdog, nan_watchdog, range_watchdog, run)
-from generalmeasurements.engine.remote import ControlServer, StatusTracker, send_command
-from generalmeasurements import load
-from generalmeasurements.plans import Axis, Scan, linear
-from generalmeasurements.sinks import HDF5Sink, NotifySink
+from gmcore.engine.remote import ControlServer, StatusTracker, send_command
+from gmcore import load
+from gmcore.plans import Axis, Scan, linear
+from gmcore.sinks import HDF5Sink, NotifySink
 
 
 async def _collect(sub):
@@ -26,7 +25,7 @@ async def _go(scan, devs, ctl=None, **kw):
 
 
 # -- compliance trip on a (fake-transport) Keithley -----------------------
-async def test_compliance_trip_aborts_and_ramps_gate_to_zero():
+async def test_compliance_trip_aborts_and_sets_gate_to_zero():
     reads = {"n": 0}
 
     def reply(cmd: str) -> str:
@@ -39,8 +38,7 @@ async def test_compliance_trip_aborts_and_ramps_gate_to_zero():
             return "KEITHLEY,MODEL 2400"
         raise AssertionError(cmd)
     t = FakeTransport(reply)
-    gate = Keithley24xx("gate", t, "2400", limits=(-5, 5), max_rate=1000,
-                        step_dt=0.0005, settle_s=0, compliance=1e-9)
+    gate = Keithley2400("gate", t, limits=(-5, 5), settle_s=0, compliance=1e-9)
     scan = Scan((Axis("gate", linear(0, 3, 20)),),
                 watchdogs=(compliance_watchdog("gate.compliance"),))
     stop, items = await _go(scan, {"gate": gate})
@@ -51,13 +49,13 @@ async def test_compliance_trip_aborts_and_ramps_gate_to_zero():
     assert lev[-1] == ":SOUR:VOLT:LEV 0" and t.log[-1] == ":OUTP OFF"
 
 
-async def test_rate_limit_enforced_inside_set():
+async def test_set_writes_the_level_in_one_step():
     t = FakeTransport()
-    k = Keithley24xx("g", t, "2400", limits=(-5, 5), max_rate=1.0, step_dt=0.01, settle_s=0)
-    await k.set(0.05)
-    levels = [float(c.split()[-1]) for c in t.log if c.startswith(":SOUR:VOLT:LEV")]
-    steps = np.diff([0.0] + levels)
-    assert (steps <= 0.01 + 1e-9).all() and levels[-1] == 0.05
+    k = Keithley2400("g", t, limits=(-5, 5), settle_s=0)
+    await k.set(3.0)                                  # no ramp: one write
+    assert [c for c in t.log if c.startswith(":SOUR:VOLT:LEV")] == [":SOUR:VOLT:LEV 3"]
+    await k.safe_state()                              # level 0 in one step, then off
+    assert t.log[-2:] == [":SOUR:VOLT:LEV 0", ":OUTP OFF"]
 
 
 # -- watchdog factories ----------------------------------------------------
@@ -115,7 +113,7 @@ async def test_retry_exhausted_pauses_then_operator_resumes():
 async def test_pause_issues_no_instrument_commands():
     t = FakeTransport({":READ?": "0,0,0,0,0", ":SENS:CURR:PROT:TRIP?": "0",
                        "*IDN?": "KEITHLEY,MODEL 2400"})
-    k = Keithley24xx("g", t, "2400", limits=(-5, 5), max_rate=1000, step_dt=0.0005,
+    k = Keithley2400("g", t, limits=(-5, 5),
                      settle_s=0.01)
     ctl = Controller()
     bus = Bus()
@@ -206,12 +204,12 @@ async def test_loop_lag_monitor_detects_blocking():
 
 # -- CLI end to end on the simulated station -------------------------------
 def test_cli_validate_and_run_sim(tmp_path, capsys):
-    assert cli.main(["validate", "station.sim.toml"]) == 0
+    assert cli.main(["validate", "tests/fixtures/sim.toml"]) == 0
     plan = tmp_path / "plan.py"
     plan.write_text(
-        "from generalmeasurements.plans import Axis, Scan, linear\n"
+        "from gmcore.plans import Axis, Scan, linear\n"
         "SCAN = Scan((Axis('gate', linear(-1, 1, 5)),), readables=('lockin',))\n")
-    rc = cli.main(["run", str(plan), "--station", "station.sim.toml", "--out", str(tmp_path),
+    rc = cli.main(["run", str(plan), "--station", "tests/fixtures/sim.toml", "--out", str(tmp_path),
                    "--sample", "T1", "--port", "0"])
     assert rc == 0
     files = list(tmp_path.glob("*_T1.h5"))
@@ -225,8 +223,8 @@ async def test_prepare_turns_output_on_only_for_devices_in_scan():
     idn = {"*IDN?": "KEITHLEY,MODEL 2400", ":READ?": "0,0,0,0,0",
            ":SENS:CURR:PROT:TRIP?": "0"}
     ta, tb = FakeTransport(dict(idn)), FakeTransport(dict(idn))
-    kw = dict(limits=(-5, 5), max_rate=1000, step_dt=0.0005, settle_s=0)
-    a, b = Keithley24xx("a", ta, "2400", **kw), Keithley24xx("b", tb, "2400", **kw)
+    kw = dict(limits=(-5, 5), settle_s=0)
+    a, b = Keithley2400("a", ta, **kw), Keithley2400("b", tb, **kw)
     stop, _ = await _go(Scan((Axis("a", (0.0, 1.0)),)), {"a": a, "b": b})
     assert stop.status == "success"
     assert ":OUTP ON" in ta.log and ta.log.index(":OUTP ON") < ta.log.index(":SOUR:VOLT:LEV 1")

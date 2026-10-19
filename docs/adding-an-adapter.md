@@ -1,7 +1,40 @@
 # Adding an adapter
 
-An adapter is one module in `generalmeasurements/devices/` that owns one instrument
+An adapter is one module in `gmcore/devices/` that owns one instrument
 session and implements the contracts in `devices/protocols.py`.
+
+## The rule: one instrument model, one driver
+
+Each instrument model gets its own files, complete on their own:
+
+| What | Where | Example (Keithley 2410) |
+| --- | --- | --- |
+| Driver | `gmcore/devices/<driver>.py`, one class | `keithley_2410.py`, `Keithley2410` |
+| Definition | `gmcore/devices/defs/<driver>.toml` | `keithley_2410.toml` |
+| One file per mode (if it has modes) | `defs/<driver>_<mode>.toml` | `keithley_2410_volt.toml`, `keithley_2410_curr.toml` |
+
+- **Nothing shared between models.** A driver imports only the common
+  plumbing: `transport`, `protocols` and `definitions`. Never another driver,
+  and no base class shared between models.
+- **Copy, don't import.** Related models (the Keithley 2400, 2401 and 2410
+  speak the same commands) each carry a full copy of their code, with their
+  own figures. Changing or testing one model can't break another, and each
+  file reads on its own.
+- **The model's figures sit in the driver.** That means ranges, output and
+  power limits, and allowed values, as class attributes, with the manual they
+  came from in the module docstring. The driver checks them in `__init__`,
+  before any I/O, so `gm validate` catches them without hardware.
+- **Exception:** a driver may serve several models that are the same
+  instrument to the program, listed in its definition's `drivers`. The SR830
+  and SR850 share `srs_lockin.py` because they have the same command set and
+  tables.
+
+Then register the driver:
+- `config/schema.py`: its config class;
+- `config/registry.py`: its builder and `DRIVER_CLASSES` entry;
+- `gui/server/window.py`: its `MODEL_NAMES` entry and its `DRIVER_GROUPS`
+  maker, for the Instrument Server's Driver menu. A driver not filed under a
+  maker shows up under "Other".
 
 ## Checklist
 
@@ -52,10 +85,12 @@ label = "My source"
 safe = "Zero, then output off"
 
 [properties.v]                      # read() key "<name>.v"
+level = 0                           # 0 essential, 1 expanded, 2 all
 label = "{name} voltage"
 unit = "V"
 
 [properties.level]
+level = 0
 access = "both"
 label = "Level"
 unit = "V"

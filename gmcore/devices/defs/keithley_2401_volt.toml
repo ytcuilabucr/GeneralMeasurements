@@ -1,0 +1,58 @@
+# Keithley 2401 sourcing voltage: the level is in V and reads back as `v`;
+# the compliance limits the current.
+
+mode = "volt"
+info = "Sources voltage. Compliance {compliance:g} A; limits {limits[0]:g} … {limits[1]:g} V."
+
+[properties.level]
+level = 0
+access = "both"
+group = "Source"
+label = "Voltage level"
+unit = "V"
+get = "programmed_level"
+set = "set"                        # one step, then settles
+readback = "v"
+limits = "limits"
+
+[properties.compliance]
+level = 1
+group = "Source"
+label = "Current compliance"
+unit = "A"
+get = "compliance"
+
+[properties.source_range]
+level = 1
+kind = "enum"
+access = "both"
+group = "Source"
+label = "Voltage source range"
+unit = "V"
+choices_attr = "source_ranges"     # this model's ranges
+allow_auto = true
+get = "get_source_range"
+set = "set_source_range"
+interlock = "!output"              # a range change glitches the output
+tooltip = "A fixed range gives finer resolution; the level must stay within 105 % of it. Changed only with the output off."
+
+[properties.sense_range]
+level = 1
+kind = "enum"
+access = "both"
+group = "Measure"
+label = "Current measure range"
+unit = "A"
+choices_attr = "sense_ranges"
+allow_auto = true
+get = "get_sense_range"
+set = "set_sense_range"
+tooltip = "Below the compliance, the output clamps at 105 % of this range (range compliance). Autorange never does."
+
+[properties.effective_compliance]
+level = 1
+group = "Source"
+label = "Effective compliance"
+unit = "A"
+get = "effective_compliance"
+tooltip = "The compliance, or 105 % of a lower fixed measure range"

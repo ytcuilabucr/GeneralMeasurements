@@ -3,11 +3,11 @@ import asyncio
 import numpy as np
 import pytest
 
-from generalmeasurements.devices.sim import Fault, FaultyDevice, SimLockin, SimMagnet, SimSource
-from generalmeasurements.engine import Bus, Controller, Event, RunStop, run
-from generalmeasurements import load
-from generalmeasurements.plans import Axis, FlyScan, PlanError, Scan, linear
-from generalmeasurements.sinks import HDF5Sink
+from gmcore.devices.sim import Fault, FaultyDevice, SimLockin, SimMagnet, SimSource
+from gmcore.engine import Bus, Controller, Event, RunStop, run
+from gmcore import load
+from gmcore.plans import Axis, FlyScan, PlanError, Scan, linear
+from gmcore.sinks import HDF5Sink
 
 
 async def _collect(sub):

@@ -1,0 +1,64 @@
+# Cryomagnetics LM-510 liquid cryogen level meter, one channel.
+#
+# read() only fetches the last measured level; each measurement heats the
+# sensor and boils off helium, so measuring is an explicit action.
+
+drivers = ["lm510"]
+label = "Cryomagnetics LM-510, channel {channel}"
+safe = "Nothing to make safe: a level meter only measures"
+groups = ["Measurement", "Meter"]
+
+[properties.level]
+level = 0
+key = ""
+label = "{name} level (channel {channel})"
+unit = "{units}"
+
+[properties.mode]
+level = 1
+kind = "enum"
+access = "both"
+group = "Measurement"
+label = "Mode"
+choices = { "Sample/Hold" = "sample/hold", Continuous = "continuous" }
+get = "mode"
+set = "set_mode"
+
+[properties.interval]
+level = 1
+access = "both"
+group = "Measurement"
+label = "Sample/Hold interval"
+unit = "s"
+get = "interval_s"
+set = "set_interval"
+limits = [1.0, 359999.0]           # up to 99:59:59 (LM-510 manual); 0 = continuous, refused
+tooltip = "Time between measurements in Sample/Hold, up to 99:59:59. 0 would mean continuous sampling (constant boil-off), so it is refused."
+
+[properties.low]
+level = 1
+group = "Meter"
+label = "Low mark"
+unit = "{units}"
+get = "snapshot.low"
+
+[properties.high]
+level = 2
+group = "Meter"
+label = "High mark"
+unit = "{units}"
+get = "snapshot.high"
+
+[properties.length]
+level = 2
+kind = "str"
+group = "Meter"
+label = "Sensor length"
+get = "snapshot.length"
+
+[properties.measure]
+level = 0
+kind = "action"
+label = "Measure now"
+set = "measure"
+tooltip = "Start one measurement (heats the sensor)"

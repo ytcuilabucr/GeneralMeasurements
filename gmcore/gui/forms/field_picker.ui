@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <author>GeneralMeasurements</author>
+ <comment>Field picker for monitor and chart windows (FieldPicker). The code sets the hint,
+the table's columns (Field, Units, and for a monitor the four alarm thresholds) and one
+row per field the hub offers.</comment>
+ <class>FieldPicker</class>
+ <widget class="QDialog" name="FieldPicker">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>720</width><height>420</height></rect>
+  </property>
+  <property name="windowTitle"><string>Choose fields</string></property>
+  <layout class="QVBoxLayout" name="lay">
+   <item>
+    <widget class="QLabel" name="hint">
+     <property name="text"><string>Tick the fields to show.</string></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTableWidget" name="table">
+     <attribute name="verticalHeaderVisible"><bool>false</bool></attribute>
+     <attribute name="horizontalHeaderStretchLastSection"><bool>false</bool></attribute>
+    </widget>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="buttons">
+     <property name="standardButtons"><set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set></property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

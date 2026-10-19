@@ -4,13 +4,13 @@ import h5py
 import numpy as np
 import pytest
 
-from generalmeasurements import cli
-from generalmeasurements.api import run_scan
-from generalmeasurements.devices.sim import Fault, FaultyDevice, SimLockin, SimMagnet, SimSource
-from generalmeasurements.engine import Bus, Controller, Event, RetryPolicy, RunStart, RunStop, run
-from generalmeasurements.engine.remote import send_command
-from generalmeasurements import load
-from generalmeasurements.plans import Axis, FlyScan, PlanError, Scan, linear
+from gmcore import cli
+from gmcore.api import run_scan
+from gmcore.devices.sim import Fault, FaultyDevice, SimLockin, SimMagnet, SimSource
+from gmcore.engine import Bus, Controller, Event, RetryPolicy, RunStart, RunStop, run
+from gmcore.engine.remote import send_command
+from gmcore import load
+from gmcore.plans import Axis, FlyScan, PlanError, Scan, linear
 
 
 # -- abort interrupts in-flight moves ---------------------------------------
@@ -155,17 +155,17 @@ def test_estimate_time_counts_only_moves():
 
 def test_cli_dry_run(capsys, tmp_path):
     plan = tmp_path / "p.py"
-    plan.write_text("from generalmeasurements.plans import Axis, Scan, linear\n"
+    plan.write_text("from gmcore.plans import Axis, Scan, linear\n"
                     "SCAN = Scan((Axis('gate', linear(-1, 1, 11), settle_s=0.1),))\n")
-    assert cli.main(["dry-run", str(plan), "--station", "station.sim.toml",
+    assert cli.main(["dry-run", str(plan), "--station", "tests/fixtures/sim.toml",
                      "--read-s", "0.5"]) == 0
     out = capsys.readouterr().out
     assert "points: 11" in out and "estimated duration" in out
     bad = tmp_path / "bad.py"
-    bad.write_text("from generalmeasurements.plans import Axis, Scan\n"
+    bad.write_text("from gmcore.plans import Axis, Scan\n"
                    "SCAN = Scan((Axis('bias', (0.0, 5.0)),))\n")     # bias limit is 1
     with pytest.raises(PlanError):
-        cli.main(["dry-run", str(bad), "--station", "station.sim.toml"])
+        cli.main(["dry-run", str(bad), "--station", "tests/fixtures/sim.toml"])
 
 
 # -- api wiring -------------------------------------------------------------

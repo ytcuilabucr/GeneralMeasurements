@@ -26,7 +26,7 @@ read-only queries to the Lake Shore 335, 625, Giga-tronics 2420B and SR850.
 
 ### Data
 - HDF5 sink (one file per run on the scan grid, fly runs as streams),
-  provenance capture, `generalmeasurements.load()` to xarray, resume of interrupted
+  provenance capture, `gmcore.load()` to xarray, resume of interrupted
   stepped runs, schema version 1.
 - Notifier sink (webhook) and live-plot sink (pyqtgraph window process).
 
@@ -36,7 +36,8 @@ read-only queries to the Lake Shore 335, 625, Giga-tronics 2420B and SR850.
   frequency or power). Read-only `configure()` checks for the Lake Shores;
   reply formats taken from the real instruments; writes not yet sent to
   hardware.
-- `station.lab.toml`: the instruments on the lab GPIB bus.
+- `Instrument config/lab.toml` (was `station.lab.toml`): the instruments on
+  the lab GPIB bus.
 - Instrument control windows `gm gui --station ...` (`gui` extra: PySide6 +
   PySide6-QtAds + pyqtgraph). There is a station window (status, log,
   station-wide actions) and one window per instrument type; same-type
@@ -58,15 +59,15 @@ read-only queries to the Lake Shore 335, 625, Giga-tronics 2420B and SR850.
   - Helium level (dewar gauge, in/day boil-off fit, time to the low mark,
     Sample/Hold vs Continuous, Measure now).
   - All three have charts with display ranges and CSV logging. They live in
-    `gui/instruments/`, one module per driver, with shared widgets in
-    `gui/widgets.py`.
+    `gui/common/dedicated_panels/`, one module per driver, with shared widgets in
+    `gui/common/widgets.py`.
 - Monitor and chart windows ("New monitor…", "New chart…" in the station
   window): big numbers with optional amber/red thresholds, or a live chart of
   several instruments with a second y-axis for a second unit.
   - Any number can be open. They are saved and restored with the layout,
     fields included.
   - They are read only: values come from the panels' existing polls through a
-    new `DataHub` (`gui/hub.py`, fed by the new `Panel.reading` signal). Extra
+    new `DataHub` (`gui/common/hub.py`, fed by the new `Panel.reading` signal). Extra
     windows add no driver reads.
   - `TimeChart` can add curves later and has a right-hand axis.
   - `StationWindow(reset_layout=True)` starts without the saved layout.
@@ -95,14 +96,131 @@ read-only queries to the Lake Shore 335, 625, Giga-tronics 2420B and SR850.
     - LS625: `quantity`.
   - Station: `[devices.X.modes.<mode>]` on a Keithley 24xx gives the other
     function's compliance, limits and max rate, so the GUI can switch to it.
-- `generalmeasurements.units`: `fmt()` / `parse_si()` without Qt (`gui.panels`
+  - Every property has a `level` by how often it is used: 0 essential,
+    1 expanded, 2 all. The standard panel shows level 0 and folds the others
+    into nested **More** / **All** toggle lists (`gui.widgets.Fold`). The
+    instrument window's **Essential / Expanded / All** buttons set every
+    panel at once, and each panel's level is saved with the layout.
+- Instrument Server (`python instrumentserver.py`, `gm server`,
+  `gui/server/`, `docs/instrument-server.md`), the first of the two main
+  GUIs (the other, General Measurement, is planned; see the project plan).
+  - One row per instrument of an instrument config: address, working name,
+    driver, connection light, Connect / Disconnect, Open panel.
+  - Open panel picks the dedicated panel, else the standard one.
+  - The File menu has Open / Save / Save as. Saving keeps the file's comments
+    (`tomlkit`, added to the `gui` extra).
+  - Add instrument is a placeholder.
+- `Instrument config/lab.toml` and `sim.toml`: the station files with
+  working names (`Keithley 2400 - 1`).
+- Device names are checked: unique by construction, no `.`, `/`, `\` or
+  quotes, no spaces at either end (`config.schema.check_name`).
+- `config.schema.DRIVERS` / `DRIVER_DEFAULTS` and
+  `config.registry.DRIVER_CLASSES`.
+- `gui.registry.panel_for()` falls back to the standard panel for any driver
+  with a definition.
+- Window layouts are Qt Designer forms (`.ui`), loaded at runtime by
+  `gui.common.uiload.load_ui()` into the window object (5 to 34 ms per window,
+  mostly widget creation). See `docs/designer.md`.
+  - Forms: the standard panel, the three cryostat panels, the Instrument
+    Server and its panel window, the monitor/chart window, the field picker,
+    and a General Measurement layout preview (Window menu of the server).
+  - Our widgets are promoted widgets with Designer properties (`Led.label`,
+    `TimeChart.yLabel` / `yUnit` / `curves_spec`, `SIEdit.unit`). Cryostat
+    cards are QFrames with `card = true` (`widgets.CardLabels`).
+  - The loader refuses object names that would replace a method.
+  - `Panel.build_layout()` is replaced by `setup_ui()`, and `Panel.UI` names
+    the form.
+- Keithley SMUs: **no Python-level ramp**. `set()` writes the level in one
+  step everywhere: the panel's Set, scan points, `safe_state()` (level 0, then
+  output off), output Off and `switch_mode()`.
+  - `max_rate` and `step_dt` are gone from the drivers, the station configs
+    (`KeithleySMUCfg`, `[devices.X.modes.*]`) and the definitions. The level
+    row is a plain Set, with no rate and no Stop.
+  - The Lake Shore ramps, which run in the instruments, are unchanged.
+- NPLC is a number box on the Keithley SMUs and the 2000, bounded by `min` /
+  `max` in each model's .toml.
+  - The drivers check against those same bounds (`definitions.prop_bounds()`),
+    and the SMUs gain `set_nplc()`.
+  - The standard panel refuses any typed value outside a property's `min` /
+    `max` / `limits` before sending it.
+- **Update settings** button at the top of the standard panel's Control box
+  (and in the cryostat panels' control boxes): re-reads the settings from the
+  instrument, queries only.
+- The standard panel's charts sit in a splitter: drag between the controls and
+  the charts, or between open charts, to resize. Closed charts take only their
+  heading's height.
+- Standard panel charts: the always-on trend is replaced by up to four folded
+  charts, one per reading channel.
+  - They are closed by default, and each has a channel drop-down and **Auto
+    zoom** (back to the default, autoranged view). `Panel.build_charts()`,
+    `TrendChart`.
+  - Every channel's history (3600 polls) is kept while charts are closed;
+    closed charts don't draw.
+  - The history restarts after a mode switch (the units may change).
+- The form loader also refuses a widget name that would replace data the code
+  set before loading (it had replaced the panel's chart list).
+- Rule for drivers: one instrument model, one driver module, and its own
+  definition files; drivers share no code (`docs/adding-an-adapter.md`).
+  - The Keithley 2400, 2401, 2410 and 2450 are now independent files
+    (`keithley_<model>.py`, `defs/keithley_<model>.toml` plus `_volt`,
+    `_curr`). `keithley_24xx.py`, `Keithley24xx`, `Spec24xx`, `model_class` and
+    `defs/keithley_24xx*.toml` are gone. The config classes are
+    `KeithleySMUCfg` / `KeithleySMUModeCfg`.
+- Instrument Server: the Driver column is a two-level menu, maker then model
+  (`gui.common.widgets.MenuPicker`, groups in `server.window.DRIVER_GROUPS`).
+- Keithley SMUs: one driver per model, `keithley_2400`, `keithley_2401`,
+  `keithley_2410`, `keithley_2450` (classes `Keithley2400` …).
+  - The station's `model` key is gone (the driver name says it).
+  - Each model's ranges, limits and power envelope come from Keithley's
+    datasheets and manuals, and are checked when the driver is built.
+  - New: `set_source_range()`, `set_sense_range()` (None = autorange), their
+    getters, and `effective_compliance`. The station takes `source_range` /
+    `sense_range`.
+  - The GUI shows both ranges as level-1 drop-downs (model's ranges + Auto).
+    The source range changes only with the output off.
+  - 2401 maximum corrected to ±21 V (was ±20 V).
+  - Compliance, NPLC and the power envelope are now checked.
+- Every control checked against the manuals (`docs/manual-review.md`):
+  - Keithley 2000: the range is a drop-down of the function's ranges; NPLC
+    0.01 added.
+  - SR830/SR850: the station amplitude and frequency are checked, and the time
+    constant is read back.
+  - LS335: output 2 in voltage mode takes heater range 0/1 only.
+  - LS625: ±60.1 A and 0.0001 … 99.999 A/s are checked.
+  - 2420B: 10 MHz … 20 GHz.
+  - LM-510: the panel interval goes up to 99:59 h.
+- `gm validate` builds every hardware driver without opening its session, so
+  settings the model can't do fail without touching the bus. It prints the
+  error instead of a traceback. The registry builds drivers before opening
+  their sessions too.
+- Definitions: an `enum` with `allow_auto` lists Auto first.
+- The Python package is now `gmcore` (was `generalmeasurements`, the same
+  name as the repository folder): `import gmcore`, `gmcore.load()`. The
+  project name, the CLI (`gm`, `generalmeasurements`) and the HDF5 provenance
+  key `generalmeasurements_version` are unchanged, so existing data files
+  load as before. All Designer forms are in `gmcore/gui/forms/`; the cryostat
+  panels are in `gui/common/dedicated_panels/`; the tests' configs are in
+  `tests/fixtures/`.
+- Reorganized for the two main GUIs:
+  - `gui/` is split into `common/` (panels, widgets, worker, hub, registry,
+    forms; shared), `server/` (Instrument Server), `measurement/` (General
+    Measurement, preview) and `legacy/` (`gm gui` station windows, monitor and
+    chart views, driver test bench). Each keeps its forms in `ui/`.
+  - The core packages (`devices`, `config`, `engine`, `plans`, `sinks`) are
+    unchanged.
+  - `station.*.toml` moved: `Instrument config/` holds the user's configs
+    (`lab`, `sim`, `example`, with working names). The tests use their own
+    copies in `tests/fixtures/`, so editing or saving a config can't break them.
+  - `examples/gate_sweep.py` uses the simulated config's names.
+- `gmcore.units`: `fmt()` / `parse_si()` without Qt (`gui.panels`
   re-exports them).
 - Adapter: Cryomagnetics LM-510 helium level meter (`lm510`, Readable).
   Unverified: the lab meter has not answered yet. The VISA transport gains
   `echo` for instruments that repeat commands on RS-232.
 - `LakeShore335.read_input()`, `get_heater_range()`, `ramp_rate()`;
   `LakeShore625.target`, `switch_heater_on()` (all queries).
-- `python guitestmain.py`: driver test bench. It scans GPIB with `*IDN?`,
+- Driver test bench (now `python -m gmcore.gui.legacy.bench`,
+  was `guitestmain.py`). It scans GPIB with `*IDN?`,
   presets an address per driver, and opens one instrument per window.
 - `config.registry.build_device()`: build one device without configuring it.
 - `errors()` (drain `:SYST:ERR?`) on the Keithley adapters; `configure()`

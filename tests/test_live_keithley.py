@@ -19,7 +19,8 @@ from pathlib import Path
 
 import pytest
 
-from generalmeasurements.devices import DriverError, Keithley24xx, Keithley2000, VisaTransport
+from gmcore.config.registry import DRIVER_CLASSES
+from gmcore.devices import DriverError, Keithley2000, VisaTransport
 
 pytestmark = pytest.mark.skipif(os.environ.get("SWEEP_LIVE") != "1",
                                 reason="live hardware tests need SWEEP_LIVE=1")
@@ -68,8 +69,7 @@ async def _open(env: str, model: str, **kw) -> RecordingTransport:
 def _smu(t, model, mode):
     limits = (-1.0, 1.0) if mode == "volt" else (-1e-6, 1e-6)
     compliance = 1e-6 if mode == "volt" else 0.2
-    return Keithley24xx(model, t, model, mode, compliance, limits, max_rate=limits[1],
-                        step_dt=0.02, settle_s=0.0)
+    return DRIVER_CLASSES[f"keithley_{model}"](model, t, mode, compliance, limits, settle_s=0.0)
 
 
 smu_params = pytest.mark.parametrize(("env", "model", "mode", "level"), SMUS,
@@ -176,7 +176,7 @@ async def test_smu_compliance_query_and_snapshot(env, model, mode, level):
     try:
         k = _smu(t, model, mode)
         await k.configure()
-        assert (await t.query(k.d.trip_cmd[mode])).strip() in ("0", "1")
+        assert (await t.query(k.trip_query)).strip() in ("0", "1")
         snap = await k.snapshot()
         assert f"MODEL {model}" in snap["idn"]
         assert await k.errors() == []

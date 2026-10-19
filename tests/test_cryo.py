@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from generalmeasurements.devices import LM510, DriverError, FakeTransport, VisaTransport
+from gmcore.devices import LM510, DriverError, FakeTransport, VisaTransport
 
 LM = {"*IDN?": "Cryomagnetics,LM-510,1234,1.70", "UNITS?": "in", "MEAS? 1": "23.4 in",
       "MODE?": "S", "INTVL?": "01:00:00", "LNGTH?": "35.0 in", "LOW?": "5.0 in",
@@ -87,8 +87,8 @@ def gui():
     pytest.importorskip("pyqtgraph")
     from PySide6 import QtCore, QtWidgets
 
-    from generalmeasurements.gui import panels
-    from generalmeasurements.gui.app import StationWindow
+    from gmcore.gui.common import panels
+    from gmcore.gui.legacy.station import StationWindow
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     made = []
 
@@ -96,7 +96,7 @@ def gui():
         async def build(n, cfg, others):
             return make_dev(n)
         monkeypatch.setattr(panels, "build_device", build)
-        w = StationWindow("station.lab.toml",
+        w = StationWindow("tests/fixtures/lab.toml",
                           QtCore.QSettings(str(tmp_path / "g.ini"),
                                            QtCore.QSettings.Format.IniFormat))
         made.append(w)
@@ -147,7 +147,7 @@ def test_temperature_panel_both_inputs_and_range_confirm(gui, tmp_path, monkeypa
     app, open_panel, wait = gui
     from PySide6 import QtWidgets
 
-    from generalmeasurements.devices import LakeShore335
+    from gmcore.devices import LakeShore335
     replies = {"*IDN?": "LSCI,MODEL335,LSA1789/#######,1.4", "OUTMODE? 1": "1,1,0",
                "RDGST? A": "0", "KRDG? A": "+77.589", "RDGST? B": "0", "KRDG? B": "+4.2310",
                "SETP? 1": "+80.000", "HTR? 1": "+12.5", "RAMPST? 1": "1", "RANGE? 1": "0",
@@ -171,7 +171,7 @@ def test_magnet_panel_status_lights_and_zero_ramp(gui, tmp_path, monkeypatch):
     _app, open_panel, wait = gui
     from PySide6 import QtWidgets
 
-    from generalmeasurements.devices import LakeShore625
+    from gmcore.devices import LakeShore625
     replies = {"*IDN?": "LSCI,MODEL625,LSA179P,1.3/1.1", "LIMIT?": "+49.6000,+5.0000,+1.0000",
                "SETI?": "+02.0000", "RDGI?": "+01.5000", "RDGV?": "+0.0123", "PSH?": "1",
                "RATE?": "+0.0350", "FLDS?": "1,0.1", "OPST?": "006", "ERST?": "000,000,000"}

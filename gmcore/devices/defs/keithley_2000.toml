@@ -1,0 +1,42 @@
+# Keithley 2000 6.5-digit multimeter.
+#
+# The measurement function is a mode (it sets the reading's and the range's
+# unit): keithley_2000_volt / _curr / _res / _fres.toml. On connect the
+# driver adopts the function the meter is in.
+
+drivers = ["keithley_2000"]
+label = "Keithley 2000 DMM"
+info = "Readings are taken with :READ? (switching the function also turns continuous trigger off)."
+mode_attr = "function"
+modes = { volt = "DC volts", curr = "DC current", res = "2-wire Ω", fres = "4-wire Ω" }
+attach = "sync"                    # adopt the present function (query only)
+switch = "switch_mode"
+safe = "Input-only instrument: nothing to do"
+groups = ["Measure"]
+
+[properties.reading]
+level = 0
+key = ""
+label = "{name}"
+
+[properties.nplc]
+level = 1
+access = "both"
+group = "Measure"
+label = "NPLC"
+get = "nplc"
+set = "set_nplc"
+min = 0.01                         # Model 2000 manual; the driver enforces these
+max = 10.0
+tooltip = "Integration time in power-line cycles (0.1 fast … 10 slow)"
+
+[properties.range]
+level = 1
+kind = "enum"
+access = "both"
+group = "Measure"
+label = "Range"
+choices_attr = "ranges"            # the present function's ranges (Model 2000 manual)
+allow_auto = true
+get = "range"
+set = "set_range"

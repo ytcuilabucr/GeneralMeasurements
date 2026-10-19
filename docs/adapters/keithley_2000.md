@@ -17,7 +17,7 @@ driver   = "keithley_2000"
 resource = "GPIB0::16::INSTR"
 function = "volt"     # volt | curr | res | fres (DC functions)
 nplc     = 10
-range    = 1.0        # omit for autorange
+range    = 1.0        # one of the function's ranges (below); omit for autorange
 ```
 
 ## Commands used
@@ -54,7 +54,11 @@ reads `9.9e+37`; use `range_watchdog` to catch it.
 ## Function (mode)
 
 One definition file per function (`devices/defs/keithley_2000_<function>.toml`,
-which set the reading's and the range's unit). `switch_mode(function)`
+which set the reading's and the range's unit). Ranges, from the User's Manual
+(2000-900-01 Rev. J): DC volts 100 mV, 1, 10, 100, 1000 V; DC current 10 mA,
+100 mA, 1 A, 3 A; ohms 100 Ω … 100 MΩ in decades. The GUI's range is a
+drop-down of the present function's ranges plus Auto; NPLC 0.01 … 10.
+`switch_mode(function)`
 configures the new function with autorange; `set_nplc()` and `set_range()`
 change one setting and check the error queue. On connect the driver adopts
 the meter's present function. Not yet run on hardware.

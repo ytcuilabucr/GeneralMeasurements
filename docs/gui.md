@@ -1,11 +1,16 @@
-# Instrument control windows
+# Instrument control windows (legacy)
+
+> **Superseded by the [Instrument Server](instrument-server.md).** These
+> windows (`gm gui`, code in `gui/legacy/`) keep working until the server
+> covers them. The panels, the standard panel's levels and the Controls table
+> below apply to both, since the panels are shared (`gui/common/`).
 
 PySide6 with the Qt Advanced Docking System (PySide6-QtAds).
 
 ```
 pip install -e .[gui]
-gm gui --station station.lab.toml     # or station.sim.toml to try it offline
-gm gui --station station.lab.toml --reset-layout
+gm gui --station "Instrument config/lab.toml"   # or "Instrument config/sim.toml" offline
+gm gui --station "Instrument config/lab.toml" --reset-layout
 ```
 
 ## Windows
@@ -19,7 +24,7 @@ gm gui --station station.lab.toml --reset-layout
 
   | Window | Drivers |
   | --- | --- |
-  | Keithley | `keithley_24xx`, `keithley_2000` |
+  | Keithley | `keithley_2400`, `keithley_2401`, `keithley_2410`, `keithley_2450`, `keithley_2000` |
   | Temperature | `lakeshore_335` |
   | Magnet | `lakeshore_625`, `sim_magnet` |
   | Helium level | `lm510` |
@@ -79,16 +84,17 @@ To try one driver at a time without a station file of your own, use the test
 bench:
 
 ```
-python guitestmain.py [--station station.lab.toml]
+python -m gmcore.gui.legacy.bench [--station "Instrument config/lab.toml"]
 ```
 
 - At start it asks every GPIB address for `*IDN?` (queries only). **Rescan
   GPIB** repeats the scan.
 - It lists one row per driver, with the address preset to where that
-  instrument answered. A driver found twice, like the two Keithley 24xx, gets
+  instrument answered. A driver found twice gets
   a row per unit. You can type any other address into the box.
 - **Open** shows that driver's panel in a new window and connects. Connecting
-  reads only.
+  reads only. Standard panels get the **Essential / Expanded / All** buttons
+  here too.
 - Limits, rates and compliance come from the station file:
   1. the entry at the chosen address;
   2. otherwise the first entry with that driver;
@@ -106,7 +112,7 @@ After connecting, **Live** polls `read()` every second (adjustable).
 
 | Instrument | On connect (queries only) |
 | --- | --- |
-| Keithley 24xx | adopts the output state and source level (`sync()`), so the first ramp starts from where the unit really is. If the unit sources a different quantity than the station's `mode`, level and output are disabled until **Configure (reset)** |
+| Keithley 2400 / 2401 / 2410 / 2450 | adopts the output state and source level (`sync()`), so the panel shows where the unit really is. If the unit sources a different quantity than the station's `mode`, level and output are disabled until **Configure (reset)** |
 | Keithley 2000 | reads the present function |
 | Lake Shore 335 | read-only checks (`configure()`); if the loop controls a different input than the station reads, setpoint ramps are disabled |
 | Lake Shore 625 | read-only checks against the supply's limits; snapshot (switch heater, SETI, errors) |
@@ -127,30 +133,51 @@ from the driver's definition (`devices/defs/*.toml`, see
 - the readings, with a light for each status (in compliance);
 - the mode, with **Switch mode…** where the driver has one;
 - one row per setting: the present value (and its readback), an editor, and
-  **Set**, or **Ramp to** and **Stop**;
+  **Set**, or **Ramp to** and **Stop** for instruments that ramp themselves
+  (the Lake Shores). A typed value outside the definition's `min` / `max` /
+  `limits` is refused before anything is sent;
+- **Update settings**, at the top of the Control box: reads every setting from
+  the instrument again (queries only). The live poll reads only the readings,
+  so use it after a change on the instrument's front panel;
 - the actions.
+
+Only the essential properties (level 0) are always shown. The rest are folded
+into two nested toggle lists: **▸ More** (level 1) and, inside it, **▸ All**
+(level 2). Click a heading to open or close it. The **Essential / Expanded /
+All** buttons on an instrument window's toolbar open or close the folds of
+every panel in that window. Each panel's level is saved with the layout.
+Folded readings are still read and recorded.
+
+Below the controls are up to four live charts, one per reading channel (fewer
+when the instrument has fewer readings), in a splitter: drag the handle
+between the controls and the charts, or between two open charts, to resize
+them. They are closed by default: click
+**▸ Chart n** to open one. Each has a drop-down to choose the reading it shows,
+and **Auto zoom** to return to the default view (fit all the data and follow
+it) after zooming or panning with the mouse. Every reading is recorded while
+its charts are closed, so a chart opens with its history (the last 3600
+polls), and choosing another reading shows that reading's history at once.
 
 What asks first, and what is disabled when, also comes from the definition.
 
 | Instrument | Controls | Asks first |
 | --- | --- | --- |
-| Keithley 24xx | Output On (level 0, then on) / Off (ramps to 0 first); level (ramps at `max_rate`, **Stop** cancels mid-ramp); Configure (reset); **Switch mode…** between voltage and current source | Output On, Configure, Switch mode |
-| Keithley 2000 | **Switch mode…** to change the function (DC V, DC I, 2-/4-wire Ω, autorange); NPLC; range (blank or `auto` for autorange) | |
+| Keithley 2400 / 2401 / 2410 / 2450 | Output On (level 0, then on) / Off (level 0 first); level (**Set** writes it in one step: there is no ramp); NPLC (a number, within the definition's min / max); source range and measure range (drop-downs of the model's ranges + Auto; the source range only with the output off); effective compliance; Configure (reset); **Switch mode…** between voltage and current source | Output On, Configure, Switch mode |
+| Keithley 2000 | **Switch mode…** to change the function (DC V, DC I, 2-/4-wire Ω, autorange); NPLC; range (drop-down of the function's ranges + Auto) | |
 | Lake Shore 335 | Ramp setpoint (K, K/min); Hold; heater range | heater range above Off |
 | Lake Shore 625 | Ramp to target at a rate (shows an ETA); Ramp to zero; Hold. Never touches the switch heater | every ramp |
 | LM-510 | Mode (Sample/Hold, Continuous); meter interval; Measure now | |
 | Giga-tronics 2420B | Frequency; power (capped at `max_power_dbm`); RF On / Off | RF On |
 | SR830 / SR850 | Sensitivity; time constant; Auto phase; reference shown read only | |
 
-**Switch mode…** on a Keithley SMU ramps the level to 0, turns the output
+**Switch mode…** on a Keithley SMU sets the level to 0, turns the output
 OFF, and resets and configures the unit in the other function. It needs that
-function's compliance, limits and max rate in the station file:
+function's compliance and limits in the station file:
 
 ```toml
 [devices.bias.modes.volt]
 compliance = 1e-6
 limits = [-1.0, 1.0]
-max_rate = 0.1
 ```
 
 The switch lasts until the GUI closes; the station file is not changed. If
@@ -197,8 +224,8 @@ All three have a display-range selector on the chart (All / 30 min / 2 h /
 24 h) and **Log to CSV** (one file per instrument per day, in the folder you
 pick).
 
-**Safe state** calls the drivers' `safe_state()`: sources ramp to zero then
-turn off, RF turns off, the magnet and temperature hold. It works at three
+**Safe state** calls the drivers' `safe_state()`: the Keithleys set the level
+to zero (one step) then turn off, RF turns off, the magnet and temperature hold. It works at three
 levels: per instrument (on its panel), per window (window toolbar), and **All
 safe state** (station window). The last two follow the station's
 `shutdown_order`.
@@ -215,7 +242,7 @@ Closing the station window with instruments connected asks: **Leave as is**
 
 ## Code
 
-`generalmeasurements/gui/`:
+`gmcore/gui/common/` (shared with the Instrument Server):
 
 - `worker.py`: one asyncio loop in a background thread for all windows, so
   every session has a single owner and the windows stay responsive during a
@@ -223,8 +250,9 @@ Closing the station window with instruments connected asks: **Leave as is**
 - `panels.py`: the base panel; `DefinitionPanel`, the standard look built
   from a driver's definition (Keithleys, RF source, lock-ins); and
   `GenericPanel` for simulators and any Movable/Rampable without a definition.
-- `instruments/`: the panels with their own look, one module per instrument,
-  named like its driver (`instruments/lakeshore_625.py` ↔
+  Also `detail_actions()`, the Essential / Expanded / All toolbar buttons.
+- `dedicated_panels/`: the panels with their own look, one module per instrument,
+  named like its driver (`dedicated_panels/lakeshore_625.py` ↔
   `devices/lakeshore_625.py`).
 - `widgets.py`: LEDs, cards, the dewar gauge, the field bar, the wall-clock
   chart, CSV logging, and the stable/rate fits.
@@ -233,14 +261,20 @@ Closing the station window with instruments connected asks: **Leave as is**
   `_got()`, the one place poll data leaves a panel. The hub re-broadcasts it
   per field key (`updated`), tracks connections (`device_changed`) and keeps
   the latest value per field.
+- `uiload.py` and `ui/`: the Designer forms ([designer.md](designer.md)).
+
+`gmcore/gui/legacy/` (these windows):
+
 - `views.py`: the field picker, `MonitorView`, `ChartView`, and `ViewWindow`
   (one QtAds dock, saved with the layout).
-- `app.py`: `StationWindow` owns the worker, the sessions and the panels;
+- `station.py`: `StationWindow` owns the worker, the sessions and the panels;
   `InstrumentWindow` holds one `CDockManager`; `WINDOW_OF_DRIVER` maps drivers
   to windows; layout save and restore.
+- `bench.py`: the driver test bench.
 
-Tests are in `tests/test_gui.py` and `tests/test_cryo.py`: offscreen, on
-simulators and fake transports.
+Tests are in `tests/test_gui.py`, `tests/test_cryo.py` and
+`tests/test_bench.py`: offscreen, on simulators and fake transports, with the
+configs in `tests/fixtures/`.
 
 Drivers stay free of Qt, so scans, `gm validate` and CI don't need it, and the
 safety checks live in one place that the GUI can only call into.
@@ -249,8 +283,9 @@ To add a new instrument:
 
 1. Write the driver and its definition, `devices/defs/<driver>.toml`
    ([definitions.md](definitions.md)).
-2. For the standard look, map the driver to `DefinitionPanel` in `PANELS`
-   (`panels.py`); no GUI code is needed. For a custom look, subclass `Panel`
-   in `instruments/<driver>.py` and fill in `build_layout()`, `attach()` and
-   `show_data()`.
-3. Map the driver to a window in `WINDOW_OF_DRIVER`.
+2. For the standard look, nothing more: any driver with a definition gets
+   `DefinitionPanel`. For a custom look, draw `forms/<driver>.ui` in
+   Designer ([designer.md](designer.md)), subclass `Panel` in
+   `common/dedicated_panels/<driver>.py` with `UI = "<driver>"`, fill in
+   `setup_ui()`, `attach()` and `show_data()`, and add it to `CRYO_PANELS`.
+3. For these legacy windows, map the driver to a window in `WINDOW_OF_DRIVER`.

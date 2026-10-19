@@ -11,14 +11,16 @@ ads = pytest.importorskip("PySide6QtAds")
 pytest.importorskip("pyqtgraph")
 from PySide6 import QtCore, QtWidgets  # noqa: E402
 
-from generalmeasurements.devices import (FakeTransport, Gigatronics2420B,  # noqa: E402
-                                         Keithley24xx, LakeShore625)
-from generalmeasurements.gui import panels  # noqa: E402
-from generalmeasurements.gui.app import StationWindow  # noqa: E402
-from generalmeasurements.gui.panels import fmt, parse_si  # noqa: E402
+from gmcore.devices import (FakeTransport, Gigatronics2420B, Keithley2400,  # noqa: E402
+                            Keithley2401, LakeShore625)
+from gmcore.gui.common import panels  # noqa: E402
+from gmcore.gui.legacy.station import StationWindow  # noqa: E402
+from gmcore.gui.common.panels import fmt, parse_si  # noqa: E402
 
 YES = QtWidgets.QMessageBox.StandardButton.Yes
 
+# the range queries a Keithley panel makes on connect: "autoranging"
+AUTORANGE = {f":{k}:{f}:RANG:AUTO?": "1" for k in ("SOUR", "SENS") for f in ("VOLT", "CURR")}
 
 @pytest.fixture
 def app():
@@ -70,7 +72,7 @@ def test_fmt_and_parse():
 
 
 def test_lab_station_one_window_per_instrument_type(app, window):
-    w = window("station.lab.toml")
+    w = window("tests/fixtures/lab.toml")
     groups = {t: [p.name for p in iw.panels] for t, iw in w.windows.items()}
     assert groups == {"Keithley": ["gate", "bias", "dmm"], "Lock-in": ["lockin"],
                       "Temperature": ["temp"], "Magnet": ["magnet"], "RF source": ["rf"],
@@ -81,7 +83,7 @@ def test_lab_station_one_window_per_instrument_type(app, window):
 
 
 def test_window_key_overrides_grouping(app, window, tmp_path):
-    src = open("station.sim.toml", encoding="utf-8").read()
+    src = open("tests/fixtures/sim.toml", encoding="utf-8").read()
     src = src.replace('driver = "sim_magnet"', 'driver = "sim_magnet"\nwindow = "Sources"')
     (tmp_path / "st.toml").write_text(src, "utf-8")
     w = window(tmp_path / "st.toml")
@@ -90,7 +92,7 @@ def test_window_key_overrides_grouping(app, window, tmp_path):
 
 
 def test_layout_saved_and_restored(app, window):
-    w = window("station.lab.toml")
+    w = window("tests/fixtures/lab.toml")
     w.show()
     k = w.windows["Keithley"]
     area = k.dock("gate").dockAreaWidget()
@@ -98,7 +100,7 @@ def test_layout_saved_and_restored(app, window):
     assert not k.dock("dmm").isTabbed()                 # split out beside the others
     w.windows["Magnet"].close()
     w.save_layout()
-    w2 = window("station.lab.toml")                     # same ini file
+    w2 = window("tests/fixtures/lab.toml")                     # same ini file
     k2 = w2.windows["Keithley"]
     assert not k2.dock("dmm").isTabbed() and k2.dock("gate").isTabbed()
     w2.show()
@@ -108,7 +110,7 @@ def test_layout_saved_and_restored(app, window):
 
 
 def test_callbacks_run_on_the_gui_thread(app, window):
-    w = window("station.sim.toml")
+    w = window("tests/fixtures/sim.toml")
     seen = []
 
     async def where():
@@ -120,7 +122,7 @@ def test_callbacks_run_on_the_gui_thread(app, window):
 
 
 def test_sim_station_connect_set_and_ramp(app, window, monkeypatch):
-    w = window("station.sim.toml")
+    w = window("tests/fixtures/sim.toml")
     assert set(w.panels) == {"gate", "bias", "magnet", "lockin"}
     w.connect_all()
     wait(app, lambda: len(w.devices) == 4)            # lockin waits for its source
@@ -147,7 +149,7 @@ def test_sim_station_connect_set_and_ramp(app, window, monkeypatch):
 # -- monitor and chart windows (DataHub) -----------------------------------------------------
 def _sim_connected(app, window, ini="gui.ini"):
     """Sim station, all connected, no live timers: polls happen only when asked."""
-    w = window("station.sim.toml", ini)
+    w = window("tests/fixtures/sim.toml", ini)
     for p in w.panels.values():
         p.live.setChecked(False)
     w.connect_all()
@@ -174,7 +176,7 @@ def _count_reads(dev):
 
 
 def _fields(w, *keys, **alarms):
-    from generalmeasurements.gui.views import ViewField
+    from gmcore.gui.legacy.views import ViewField
     out = []
     for k in keys:
         f = ViewField.of(w.hub.field(k))
@@ -244,7 +246,7 @@ def test_views_saved_and_restored_with_fields(app, window):
     closed.close()                                          # closed: not saved
     assert "Chart 2" not in w.views
     w.save_layout()
-    w2 = window("station.sim.toml", "views.ini")            # same file, nothing connected
+    w2 = window("tests/fixtures/sim.toml", "views.ini")            # same file, nothing connected
     assert set(w2.views) == {"Monitor 1", "Chart 1"}
     mon = w2.views["Monitor 1"]
     assert [f.key for f in mon.fields] == ["gate", "lockin.x"]
@@ -260,8 +262,8 @@ def test_reset_layout_forgets_saved_views(app, window, tmp_path):
     w = _sim_connected(app, window, "reset.ini")
     w.open_view("monitor", _fields(w, "gate"))
     w.save_layout()
-    from generalmeasurements.gui.app import StationWindow
-    fresh = StationWindow("station.sim.toml",
+    from gmcore.gui.legacy.station import StationWindow
+    fresh = StationWindow("tests/fixtures/sim.toml",
                           QtCore.QSettings(str(tmp_path / "reset.ini"),
                                            QtCore.QSettings.Format.IniFormat),
                           reset_layout=True)
@@ -272,7 +274,7 @@ def test_reset_layout_forgets_saved_views(app, window, tmp_path):
 
 
 def test_field_picker_selection_and_validation(app, window):
-    from generalmeasurements.gui.views import FieldPicker
+    from gmcore.gui.legacy.views import FieldPicker
     w = _sim_connected(app, window)
     dlg = FieldPicker("monitor", w.hub.fields())
     with pytest.raises(ValueError, match="at least one"):
@@ -297,10 +299,10 @@ def _fake(monkeypatch, make_dev):
 
 
 def test_keithley_panel_attach_does_not_reset(app, window, monkeypatch):
-    t = FakeTransport({":SOUR:FUNC?": "CURR", ":OUTP?": "1", ":SOUR:CURR:LEV?": "1.05E-06",
+    t = FakeTransport({**AUTORANGE, ":SOUR:FUNC?": "CURR", ":OUTP?": "1", ":SOUR:CURR:LEV?": "1.05E-06",
                        ":READ?": "0.1,1.05e-6,0,0,0", ":SENS:VOLT:PROT:TRIP?": "0"})
-    _fake(monkeypatch, lambda n: Keithley24xx(n, t, "2401", "curr", 0.2, (-2e-6, 2e-6), 1e-6))
-    w = window("station.lab.toml")
+    _fake(monkeypatch, lambda n: Keithley2401(n, t, "curr", 0.2, (-2e-6, 2e-6)))
+    w = window("tests/fixtures/lab.toml")
     p = w.panels["bias"]
     p.connect_dev()
     wait(app, lambda: p.ctrl_box.isEnabled())
@@ -311,9 +313,9 @@ def test_keithley_panel_attach_does_not_reset(app, window, monkeypatch):
 
 
 def test_keithley_panel_mode_mismatch_disables_source(app, window, monkeypatch):
-    t = FakeTransport({":SOUR:FUNC?": "CURR", ":OUTP?": "0"})
-    _fake(monkeypatch, lambda n: Keithley24xx(n, t, "2400", "volt", 1e-6, (-1, 1), 0.1))
-    w = window("station.lab.toml")
+    t = FakeTransport({**AUTORANGE, ":SOUR:FUNC?": "CURR", ":OUTP?": "0"})
+    _fake(monkeypatch, lambda n: Keithley2400(n, t, "volt", 1e-6, (-1, 1)))
+    w = window("tests/fixtures/lab.toml")
     p = w.panels["gate"]
     p.connect_dev()
     wait(app, lambda: p.ctrl_box.isEnabled())
@@ -329,10 +331,10 @@ def test_lakeshore625_ramp_asks_then_moves(app, window, monkeypatch):
                "RATE?": "+0.0350", "FLDS?": "1,0.1", "OPST?": "006", "ERST?": "000,000,000"}
     t = FakeTransport(replies)
     _fake(monkeypatch, lambda n: LakeShore625(n, t, (-10, 10), 0.035))
-    w = window("station.lab.toml")
+    w = window("tests/fixtures/lab.toml")
     p = w.panels["magnet"]
     p.connect_dev()
-    wait(app, lambda: p.ctrl_box.isEnabled())
+    wait(app, lambda: p.btn_read.isEnabled())           # connected (no Control box here)
     assert not any(c.startswith(("SETI ", "RATE ")) for c in t.log)
     p.target.setText("1")
     monkeypatch.setattr(QtWidgets.QMessageBox, "question",
@@ -349,12 +351,14 @@ def test_gigatronics_power_cap_enforced(app, window, monkeypatch):
     t = FakeTransport({"OUTP?": "0", "FREQ?": "7054000000.0", "POW?": "20.00",
                        "SYST:ERR?": "0, No error"})
     _fake(monkeypatch, lambda n: Gigatronics2420B(n, t, max_power_dbm=0.0))
-    w = window("station.lab.toml")
+    w = window("tests/fixtures/lab.toml")
     p = w.panels["rf"]
     p.connect_dev()
     wait(app, lambda: p.ctrl_box.isEnabled())
     p.rows["power"].edit.setText("5")
-    p._write_from_edit("power")
+    p._write_from_edit("power")                      # the panel checks the definition's max
+    assert "refused: allowed at most 0 dBm; not sent" in w.log_view.toPlainText()
+    p.write_prop("power", 5.0)                       # ... and the driver checks again
     wait(app, lambda: "max_power_dbm" in w.log_view.toPlainText())
     assert not any(c.startswith("POW ") for c in t.log)
     assert "max_power_dbm" in w.windows["RF source"].statusBar().currentMessage()
@@ -362,14 +366,20 @@ def test_gigatronics_power_cap_enforced(app, window, monkeypatch):
 
 # -- the panel built from a driver's definition ----------------------------------------
 class _SMU:
-    """Replies like a 24xx that remembers its source function and output."""
+    """Replies like a Keithley 2400 that remembers its source function, output and ranges."""
 
     def __init__(self, func="VOLT"):
         self.func, self.out, self.log = func, "0", []
+        self.ranges: dict[str, str] = {}             # ":SOUR:VOLT" -> "2"; absent = auto
 
     def __call__(self, cmd):
-        return {":SOUR:FUNC?": self.func, ":OUTP?": self.out, ":SYST:ERR?": "0,No error",
-                ":READ?": "0.1,1e-07,0,0,0"}.get(cmd, "0")
+        for k, v in self.ranges.items():
+            if cmd == f"{k}:RANG:AUTO?":
+                return "0"
+            if cmd == f"{k}:RANG?":
+                return v
+        return {**AUTORANGE, ":SOUR:FUNC?": self.func, ":OUTP?": self.out,
+                ":SYST:ERR?": "0,No error", ":READ?": "0.1,1e-07,0,0,0"}.get(cmd, "0")
 
     def transport(self):
         smu = self
@@ -381,20 +391,43 @@ class _SMU:
                     smu.func = cmd.split()[1]
                 if cmd.startswith(":OUTP "):
                     smu.out = "1" if cmd.endswith("ON") else "0"
+                head, _, arg = cmd.partition(":RANG")
+                if arg.startswith(":AUTO ON"):
+                    smu.ranges.pop(head, None)
+                elif arg.startswith(" "):
+                    smu.ranges[head] = arg.strip()
         return T(self)
 
 
 def test_definition_panel_output_asks_then_reads(app, window, monkeypatch):
     smu = _SMU()
     t = smu.transport()
-    _fake(monkeypatch, lambda n: Keithley24xx(n, t, "2400", "volt", 1e-6, (-1, 1), 50.0,
-                                              settle_s=0, step_dt=0.001))
-    w = window("station.lab.toml")
+    _fake(monkeypatch, lambda n: Keithley2400(n, t, "volt", 1e-6, (-1, 1),
+                                              settle_s=0))
+    w = window("tests/fixtures/lab.toml")
     p = w.panels["gate"]
     assert isinstance(p, panels.DefinitionPanel)
     p.connect_dev()
     wait(app, lambda: p.ctrl_box.isEnabled() and "output" in p.rows)
-    assert list(p.rows) == ["output", "level", "compliance", "nplc"]     # by group
+    assert list(p.rows) == ["output", "level",                            # level 0
+                            "compliance", "source_range", "effective_compliance",
+                            "sense_range",                               # 1, by group
+                            "nplc"]                                      # 2
+    src = p.rows["source_range"].edit                     # this model's ranges + Auto
+    assert [src.itemText(i) for i in range(src.count())] == [
+        "Auto", "200 mV", "2 V", "20 V", "200 V"]
+    assert src.currentText() == "Auto" and p.rows["sense_range"].now.text() == "auto"
+    assert all(c.isEnabled() for c in p.rows["source_range"].controls)   # output off
+    src.setCurrentText("2 V")
+    p.rows["source_range"].controls[1].click()                          # Set
+    wait(app, lambda: p.rows["source_range"].now.text() == "2 V")       # read back
+    assert ":SOUR:VOLT:RANG 2" in t.log
+    sense = p.rows["sense_range"].edit
+    sense.setCurrentText("10 µA")
+    p.rows["sense_range"].controls[1].click()
+    wait(app, lambda: p.rows["sense_range"].now.text() == "10 µA")       # read back
+    assert ":SENS:CURR:RANG 1e-05" in t.log
+    assert p.rows["effective_compliance"].now.text() == "1 µA"   # 1 µA < 10.5 µA: unchanged
     assert p.rows["level"].unit == "V" and p.rows["compliance"].unit == "A"
     assert ":READ?" not in t.log                       # read_if: output is off
     monkeypatch.setattr(QtWidgets.QMessageBox, "question",
@@ -406,6 +439,8 @@ def test_definition_panel_output_asks_then_reads(app, window, monkeypatch):
     p.write_prop("output", True)
     wait(app, lambda: p._labels["gate.v"][0].text() == "100 mV")
     assert t.log.index(":SOUR:VOLT:LEV 0") < t.log.index(":OUTP ON")
+    wait(app, lambda: not any(c.isEnabled() for c in p.rows["source_range"].controls))
+    assert all(c.isEnabled() for c in p.rows["sense_range"].controls)  # allowed while on
     p.rows["level"].edit.setText("200m")
     p._write_from_edit("level")
     wait(app, lambda: p.rows["level"].now.text().startswith("200 mV · read"))
@@ -413,20 +448,20 @@ def test_definition_panel_output_asks_then_reads(app, window, monkeypatch):
 
 
 def test_definition_panel_switches_mode_with_station_settings(app, window, monkeypatch):
-    from generalmeasurements.config.schema import K24xxModeCfg
+    from gmcore.config.schema import KeithleySMUModeCfg
     smu = _SMU("CURR")
     t = smu.transport()
-    _fake(monkeypatch, lambda n: Keithley24xx(n, t, "2401", "curr", 0.2, (-2e-6, 2e-6), 1e-6))
+    _fake(monkeypatch, lambda n: Keithley2401(n, t, "curr", 0.2, (-2e-6, 2e-6)))
     monkeypatch.setattr(QtWidgets.QMessageBox, "question", lambda *a, **k: YES)
-    w = window("station.lab.toml")
+    w = window("tests/fixtures/lab.toml")
     p = w.panels["bias"]
     p.connect_dev()
     wait(app, lambda: p.ctrl_box.isEnabled() and "level" in p.rows)
     p.switch_mode("volt")                               # the station has no volt settings
     assert "add [devices.bias.modes.volt]" in w.log_view.toPlainText()
     assert "*RST" not in t.log
-    p.cfg = p.cfg.model_copy(update={"modes": {"volt": K24xxModeCfg(
-        compliance=1e-6, limits=(-1, 1), max_rate=0.1)}})
+    p.cfg = p.cfg.model_copy(update={"modes": {"volt": KeithleySMUModeCfg(
+        compliance=1e-6, limits=(-1, 1))}})
     p.switch_mode("volt")
     wait(app, lambda: p.defn is not None and p.defn.mode == "volt" and "level" in p.rows)
     assert ":SOUR:FUNC VOLT" in t.log and p.cfg.mode == "volt"
@@ -436,7 +471,7 @@ def test_definition_panel_switches_mode_with_station_settings(app, window, monke
 
 
 def test_definition_panel_dmm_function_and_lockin_tables(app, window, monkeypatch):
-    from generalmeasurements.devices import SR850, Keithley2000
+    from gmcore.devices import SR850, Keithley2000
     func = ['"FRES"']
 
     class Meter(FakeTransport):                         # reports the function last written
@@ -450,7 +485,7 @@ def test_definition_panel_dmm_function_and_lockin_tables(app, window, monkeypatc
                           "SLVL?": "0.1", "PHAS?": "0", "SNAP? 1,2,3,4": "1e-6,0,1e-6,0"})
     devs = {"dmm": lambda n: Keithley2000(n, dmm_t, "volt"), "lockin": lambda n: SR850(n, li_t)}
     _fake(monkeypatch, lambda n: devs[n](n))
-    w = window("station.lab.toml")
+    w = window("tests/fixtures/lab.toml")
     dmm, li = w.panels["dmm"], w.panels["lockin"]
     dmm.connect_dev()
     li.connect_dev()
@@ -467,14 +502,49 @@ def test_definition_panel_dmm_function_and_lockin_tables(app, window, monkeypatc
     wait(app, lambda: "SENS 10" in li_t.log)
 
 
+def test_definition_panel_folds_by_level(app, window, monkeypatch):
+    from gmcore.devices import SR850
+    li_t = FakeTransport({"SENS?": "17", "OFLT?": "8", "*IDN?": "SR850", "FREQ?": "1000",
+                          "SLVL?": "0.1", "PHAS?": "0", "SNAP? 1,2,3,4": "1e-6,0,2e-6,45"})
+    _fake(monkeypatch, lambda n: SR850(n, li_t))
+    w = window("tests/fixtures/lab.toml")
+    li, win = w.panels["lockin"], w.windows["Lock-in"]
+    li.connect_dev()
+    wait(app, lambda: "sensitivity" in li.rows and len(li.folds) == 2)
+    more, every = li.folds
+    assert every.isAncestorOf(li.rows["idn"].now) and more.body.isAncestorOf(every)  # nested
+    assert more.body.isAncestorOf(li.rows["frequency"].now)
+    assert not more.isAncestorOf(li.rows["sensitivity"].now)                   # level 0
+    assert li.rows["sensitivity"].now.isVisibleTo(li)
+    assert not li.rows["frequency"].now.isVisibleTo(li)                        # folded
+    wait(app, lambda: li._labels["lockin.r"][0].text() == "2 µV")   # still read while folded
+    assert not li._labels["lockin.r"][0].isVisibleTo(li)
+    assert li._labels["lockin.x"][0].isVisibleTo(li)
+    win.set_detail(1)
+    assert li.rows["frequency"].now.isVisibleTo(li) and not li.rows["idn"].now.isVisibleTo(li)
+    win.detail_actions[2].trigger()
+    assert li.detail == 2 and li.rows["idn"].now.isVisibleTo(li)
+    more.set_open(False)                                # by hand: All stays open inside
+    assert li.detail == 0 and every.is_open()
+    more.set_open(True)
+    assert li.detail == 2
+    win.set_detail(1)
+    w.save_layout()
+    w2 = window("tests/fixtures/lab.toml")                     # same ini file
+    assert w2.panels["lockin"].detail == 1 and w2.windows["Lock-in"].detail_actions[1].isChecked()
+    assert w2.panels["gate"].detail == 0                # Keithley window: not changed
+    assert not w2.windows["Temperature"].detail_actions   # own layout, no folds
+    li.timer.stop()
+
+
 def test_definition_panel_renders_a_cryostat_driver(app, window, monkeypatch):
-    from generalmeasurements.devices import LakeShore335
+    from gmcore.devices import LakeShore335
     replies = {"RANGE? 1": "0", "*IDN?": "LSCI,MODEL335", "SETP? 1": "4.0", "RAMP? 1": "0,2",
                "OUTMODE? 1": "1,1,0", "PID? 1": "50,20,0", "RDGST? A": "0", "KRDG? A": "4.2",
                "HTR? 1": "0.0"}
     t = FakeTransport(replies)
     _fake(monkeypatch, lambda n: LakeShore335(n, t, "A", 1, (2, 300), 0.0333))
-    w = window("station.lab.toml")
+    w = window("tests/fixtures/lab.toml")
     p = panels.DefinitionPanel("temp", w.cfg.devices["temp"], w)
     p.connect_dev()
     wait(app, lambda: "heater_range" in p.rows and p.rows["heater_range"].now.text() == "Off")
@@ -487,4 +557,75 @@ def test_definition_panel_renders_a_cryostat_driver(app, window, monkeypatch):
     p.write_prop("heater_range", 3)
     wait(app, lambda: "RANGE 1,3" in t.log)
     assert asked == ["Set the loop 1 heater range to High?"]
+    p.timer.stop()
+
+
+def test_charts_folded_one_per_channel_up_to_four(app, window, monkeypatch):
+    from gmcore.devices import SR850
+    li_t = FakeTransport({"SENS?": "17", "OFLT?": "8", "*IDN?": "SR850", "FREQ?": "1000",
+                          "SLVL?": "0.1", "PHAS?": "0", "SNAP? 1,2,3,4": "1e-6,2e-6,3e-6,45"})
+    smu = _SMU()
+    devs = {"lockin": lambda n: SR850(n, li_t),
+            "gate": lambda n: Keithley2400(n, smu.transport(), "volt", 1e-6, (-1, 1))}
+    _fake(monkeypatch, lambda n: devs[n](n))
+    w = window("tests/fixtures/lab.toml")
+    li, gate = w.panels["lockin"], w.panels["gate"]
+    li.connect_dev()
+    gate.connect_dev()
+    wait(app, lambda: len(li.charts) == 4 and len(gate.charts) == 2)   # X Y R θ; V I
+    assert not any(c.fold.is_open() for c in li.charts)                # hidden by default
+    assert not li.charts[0].plot.isVisibleTo(li)
+    assert [c.channel() for c in li.charts] == ["lockin.x", "lockin.y", "lockin.r",
+                                                "lockin.theta"]
+    assert li.charts[0].combo.itemText(0) == "lockin X (V)"
+    li.poll()
+    wait(app, lambda: len(li._history["lockin.r"]) >= 1)    # recorded while folded
+    assert li.charts[0].curve.getData()[0] is None           # but not drawn
+    c = li.charts[0]
+    c.fold.set_open(True)
+    assert c.plot.isVisibleTo(li) and list(c.curve.getData()[1]) == [1e-6]
+    c.combo.setCurrentIndex(3)                               # θ on chart 1
+    assert c.channel() == "lockin.theta" and list(c.curve.getData()[1]) == [45.0]
+    assert c.plot.getPlotItem().getAxis("left").labelText == "lockin phase"
+    c.plot.getPlotItem().setXRange(100, 200)                 # the user zooms in ...
+    assert not c.plot.getPlotItem().getViewBox().autoRangeEnabled()[0]
+    c.zoom.click()                                           # ... Auto zoom goes back
+    assert all(c.plot.getPlotItem().getViewBox().autoRangeEnabled())
+    for p in (li, gate):
+        p.timer.stop()
+
+
+def test_update_settings_nplc_box_and_resizable_charts(app, window, monkeypatch):
+    smu = _SMU()
+    t = smu.transport()
+    _fake(monkeypatch, lambda n: Keithley2400(n, t, "volt", 1e-6, (-1, 1), settle_s=0))
+    w = window("tests/fixtures/lab.toml")
+    p = w.panels["gate"]
+    p.connect_dev()
+    wait(app, lambda: "nplc" in p.rows and len(p.charts) == 2)
+    # Update settings: in the Control box, re-reads the settings with queries only
+    assert p.ctrl_box.isAncestorOf(p.btn_update)
+    sent = len(t.log)
+    p.btn_update.click()
+    wait(app, lambda: len(t.log) > sent)
+    assert all(c.endswith("?") for c in t.log[sent:])
+    # NPLC: a number box, bounded by min / max in keithley_2400.toml
+    nplc = p.rows["nplc"]
+    assert isinstance(nplc.edit, panels.SIEdit) and "limits 0.01 … 10" in nplc.edit.parent().toolTip()
+    nplc.edit.setText("20")
+    p._write_from_edit("nplc")
+    assert "refused: allowed 0.01 … 10" in w.log_view.toPlainText()
+    nplc.edit.setText("0.5")
+    p._write_from_edit("nplc")
+    wait(app, lambda: ":SENS:CURR:NPLC 0.5" in t.log)
+    # the level is a plain Set: no rate box, no Stop
+    assert p.rows["level"].rate is None
+    assert [b.text() for b in p.rows["level"].controls if isinstance(b, QtWidgets.QPushButton)] \
+        == ["Set"]
+    # charts: panes of a splitter below the controls; closed ones only as tall as their heading
+    assert p.charts_split.count() == 2 and p.main_split.widget(1) is p.charts_split
+    closed = p.charts[0].fold
+    assert closed.maximumHeight() < 60
+    closed.set_open(True)
+    assert closed.maximumHeight() > 10000
     p.timer.stop()

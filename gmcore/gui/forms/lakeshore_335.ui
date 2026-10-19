@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <author>GeneralMeasurements</author>
+ <comment>Lake Shore 335 temperature controller panel (LakeShore335Panel), after the
+legacy TemperatureControl.vi. Cards are QFrames with the dynamic property card=true
+and labels &lt;frame&gt;_caption / _value / _sub. Code fills the values, the chart and the
+log; it never writes PID. Accent colour #d35400 (also in the code's ACCENT).</comment>
+ <class>LakeShore335Panel</class>
+ <widget class="QWidget" name="LakeShore335Panel">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>760</width><height>860</height></rect>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QLabel[panelTitle=&quot;true&quot;] { background: #d35400; color: white; padding: 6px 10px; border-radius: 4px; font-size: 12pt; }
+QGroupBox { border: 1px solid #d35400; border-radius: 6px; margin-top: 1.1em; padding: 6px; }
+QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; color: #d35400; font-weight: bold; }
+QFrame[card=&quot;true&quot;] { border: 1px solid #d35400; border-left: 6px solid #d35400; border-radius: 6px; background: palette(base); }
+QFrame[card=&quot;true&quot;] QLabel { border: none; }
+QProgressBar::chunk { background: #d35400; }</string>
+  </property>
+  <layout class="QVBoxLayout" name="root" stretch="0,0,0,1,0,0,0,0">
+   <item>
+    <layout class="QHBoxLayout" name="head">
+     <item>
+      <widget class="QLabel" name="title">
+       <property name="text"><string>&lt;b&gt;name&lt;/b&gt; &amp;nbsp; lakeshore_335 &amp;nbsp; address</string></property>
+       <property name="panelTitle" stdset="0"><bool>true</bool></property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="head_stretch">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+     <item><widget class="QLabel" name="status"><property name="text"><string>disconnected</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_connect"><property name="text"><string>Connect</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_disconnect"><property name="text"><string>Disconnect</string></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="cards" stretch="2,2,1,1">
+     <item>
+      <widget class="QFrame" name="cardA">
+       <property name="card" stdset="0"><bool>true</bool></property>
+       <layout class="QVBoxLayout" name="cardA_lay">
+        <item><widget class="QLabel" name="cardA_caption"><property name="text"><string>&lt;b&gt;Temp A&lt;/b&gt;</string></property></widget></item>
+        <item><widget class="QLabel" name="cardA_value"><property name="styleSheet"><string notr="true">font-size: 22pt; font-family: Consolas, monospace;</string></property><property name="text"><string>—</string></property></widget></item>
+        <item><widget class="QLabel" name="cardA_sub"><property name="styleSheet"><string notr="true">color: palette(mid);</string></property><property name="text"><string/></property></widget></item>
+        <item>
+         <layout class="QHBoxLayout" name="cardA_extra">
+          <item><widget class="Led" name="stable_A"><property name="label" stdset="0"><string>stable</string></property></widget></item>
+          <item><spacer name="cardA_stretch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
+          <item><widget class="QLabel" name="rate_A"><property name="text"><string>rate —</string></property></widget></item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QFrame" name="cardB">
+       <property name="card" stdset="0"><bool>true</bool></property>
+       <layout class="QVBoxLayout" name="cardB_lay">
+        <item><widget class="QLabel" name="cardB_caption"><property name="text"><string>&lt;b&gt;Temp B&lt;/b&gt;</string></property></widget></item>
+        <item><widget class="QLabel" name="cardB_value"><property name="styleSheet"><string notr="true">font-size: 22pt; font-family: Consolas, monospace;</string></property><property name="text"><string>—</string></property></widget></item>
+        <item><widget class="QLabel" name="cardB_sub"><property name="styleSheet"><string notr="true">color: palette(mid);</string></property><property name="text"><string/></property></widget></item>
+        <item>
+         <layout class="QHBoxLayout" name="cardB_extra">
+          <item><widget class="Led" name="stable_B"><property name="label" stdset="0"><string>stable</string></property></widget></item>
+          <item><spacer name="cardB_stretch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
+          <item><widget class="QLabel" name="rate_B"><property name="text"><string>rate —</string></property></widget></item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QFrame" name="cardSp">
+       <property name="card" stdset="0"><bool>true</bool></property>
+       <layout class="QVBoxLayout" name="cardSp_lay">
+        <item><widget class="QLabel" name="cardSp_caption"><property name="text"><string>&lt;b&gt;Setpoint&lt;/b&gt;</string></property></widget></item>
+        <item><widget class="QLabel" name="cardSp_value"><property name="styleSheet"><string notr="true">font-size: 15pt; font-family: Consolas, monospace;</string></property><property name="text"><string>—</string></property></widget></item>
+        <item><widget class="QLabel" name="cardSp_sub"><property name="styleSheet"><string notr="true">color: palette(mid);</string></property><property name="text"><string/></property></widget></item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QFrame" name="cardHeat">
+       <property name="card" stdset="0"><bool>true</bool></property>
+       <layout class="QVBoxLayout" name="cardHeat_lay">
+        <item><widget class="QLabel" name="cardHeat_caption"><property name="text"><string>&lt;b&gt;Heater output&lt;/b&gt;</string></property></widget></item>
+        <item><widget class="QLabel" name="cardHeat_value"><property name="styleSheet"><string notr="true">font-size: 15pt; font-family: Consolas, monospace;</string></property><property name="text"><string>—</string></property></widget></item>
+        <item><widget class="QLabel" name="cardHeat_sub"><property name="styleSheet"><string notr="true">color: palette(mid);</string></property><property name="text"><string/></property></widget></item>
+        <item>
+         <widget class="QProgressBar" name="heat_bar">
+          <property name="maximum"><number>1000</number></property>
+          <property name="value"><number>0</number></property>
+          <property name="textVisible"><bool>false</bool></property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="info">
+     <property name="text"><string/></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="TimeChart" name="chart">
+     <property name="yLabel" stdset="0"><string>temperature</string></property>
+     <property name="yUnit" stdset="0"><string>K</string></property>
+     <property name="curves_spec" stdset="0"><string>A=#e67e22; B=#5dade2; setpoint=#f4d03f</string></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="low" stretch="3,2">
+     <item>
+      <widget class="QGroupBox" name="sp_box">
+       <property name="title"><string>Setpoint ramp</string></property>
+       <layout class="QFormLayout" name="sp_form">
+        <item row="0" column="0"><widget class="QLabel" name="ramp_state_label"><property name="text"><string>Status</string></property></widget></item>
+        <item row="0" column="1"><widget class="QLabel" name="ramp_state"><property name="text"><string>—</string></property></widget></item>
+        <item row="1" column="0"><widget class="QLabel" name="sp_label"><property name="text"><string>Setpoint</string></property></widget></item>
+        <item row="1" column="1">
+         <layout class="QHBoxLayout" name="sp_row">
+          <item><widget class="SIEdit" name="sp"><property name="unit" stdset="0"><string>K</string></property></widget></item>
+          <item><widget class="QLabel" name="sp_unit"><property name="text"><string>K  at</string></property></widget></item>
+          <item><widget class="SIEdit" name="rate"><property name="unit" stdset="0"><string>K/min</string></property></widget></item>
+          <item><widget class="QLabel" name="rate_unit"><property name="text"><string>K/min</string></property></widget></item>
+          <item><spacer name="sp_stretch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
+         </layout>
+        </item>
+        <item row="2" column="1">
+         <layout class="QHBoxLayout" name="sp_buttons">
+          <item><widget class="QPushButton" name="btn_ramp"><property name="text"><string>Ramp to setpoint</string></property></widget></item>
+          <item><widget class="QPushButton" name="btn_hold"><property name="text"><string>Hold</string></property><property name="toolTip"><string>Stop the setpoint ramp where it is now</string></property></widget></item>
+          <item><widget class="QPushButton" name="btn_update"><property name="text"><string>Update settings</string></property><property name="toolTip"><string>Read the settings from the instrument again (queries only), e.g. after a change on its front panel</string></property></widget></item>
+          <item><spacer name="sp_buttons_stretch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="heat_box">
+       <property name="title"><string>Heater</string></property>
+       <layout class="QFormLayout" name="heat_form">
+        <item row="0" column="0"><widget class="QLabel" name="range_label"><property name="text"><string>Range</string></property></widget></item>
+        <item row="0" column="1">
+         <layout class="QHBoxLayout" name="range_row">
+          <item><widget class="QPushButton" name="range_0"><property name="text"><string>Off</string></property><property name="checkable"><bool>true</bool></property></widget></item>
+          <item><widget class="QPushButton" name="range_1"><property name="text"><string>Low</string></property><property name="checkable"><bool>true</bool></property></widget></item>
+          <item><widget class="QPushButton" name="range_2"><property name="text"><string>Med</string></property><property name="checkable"><bool>true</bool></property></widget></item>
+          <item><widget class="QPushButton" name="range_3"><property name="text"><string>High</string></property><property name="checkable"><bool>true</bool></property></widget></item>
+         </layout>
+        </item>
+        <item row="1" column="0"><widget class="QLabel" name="pid_label"><property name="text"><string>PID (read only)</string></property></widget></item>
+        <item row="1" column="1"><widget class="QLabel" name="pid"><property name="text"><string>—</string></property><property name="toolTip"><string>Set PID on the front panel; this program never writes it</string></property></widget></item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="mon">
+     <item><widget class="QLabel" name="tol_label"><property name="text"><string>Stable within ±</string></property></widget></item>
+     <item>
+      <widget class="QDoubleSpinBox" name="tol">
+       <property name="decimals"><number>3</number></property>
+       <property name="minimum"><double>0.001</double></property>
+       <property name="maximum"><double>10.0</double></property>
+       <property name="singleStep"><double>0.01</double></property>
+       <property name="suffix"><string> K</string></property>
+      </widget>
+     </item>
+     <item><widget class="QLabel" name="for_label"><property name="text"><string>for</string></property></widget></item>
+     <item>
+      <widget class="QDoubleSpinBox" name="stable_win">
+       <property name="decimals"><number>0</number></property>
+       <property name="minimum"><double>5</double></property>
+       <property name="maximum"><double>3600</double></property>
+       <property name="suffix"><string> s</string></property>
+      </widget>
+     </item>
+     <item><widget class="QLabel" name="fit_label"><property name="text"><string>   Rate fit over</string></property></widget></item>
+     <item>
+      <widget class="QDoubleSpinBox" name="fit">
+       <property name="decimals"><number>1</number></property>
+       <property name="minimum"><double>0.5</double></property>
+       <property name="maximum"><double>120</double></property>
+       <property name="value"><double>5</double></property>
+       <property name="suffix"><string> min</string></property>
+      </widget>
+     </item>
+     <item><spacer name="mon_stretch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
+    </layout>
+   </item>
+   <item><widget class="CsvLog" name="log"/></item>
+   <item>
+    <layout class="QHBoxLayout" name="foot">
+     <item><widget class="QCheckBox" name="live"><property name="text"><string>Live</string></property><property name="checked"><bool>true</bool></property></widget></item>
+     <item><widget class="QDoubleSpinBox" name="interval"><property name="suffix"><string> s</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_read"><property name="text"><string>Read now</string></property></widget></item>
+     <item><spacer name="foot_stretch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QPushButton" name="btn_safe"><property name="text"><string>Safe state</string></property></widget></item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget><class>Led</class><extends>QLabel</extends><header>gmcore.gui.common.widgets</header></customwidget>
+  <customwidget><class>TimeChart</class><extends>QWidget</extends><header>gmcore.gui.common.widgets</header><container>0</container></customwidget>
+  <customwidget><class>CsvLog</class><extends>QWidget</extends><header>gmcore.gui.common.widgets</header></customwidget>
+  <customwidget><class>SIEdit</class><extends>QLineEdit</extends><header>gmcore.gui.common.panels</header></customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

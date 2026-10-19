@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <author>GeneralMeasurements</author>
+ <comment>The standard instrument panel (Panel, DefinitionPanel, GenericPanel).
+Code fills: title text, the readings grid, the Control form (one row per setting),
+and the charts. The upper part and the charts are the two sides of a splitter
+(drag the handle to give the charts more or less room), and each chart is a pane
+of the inner splitter. Names used by the code: title, status, btn_connect,
+btn_disconnect, info, readings, ctrl_box, form, btn_update, live, interval,
+btn_read, btn_safe, charts_split (the code adds the folded charts).</comment>
+ <class>Panel</class>
+ <widget class="QWidget" name="Panel">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>640</width><height>760</height></rect>
+  </property>
+  <layout class="QVBoxLayout" name="root">
+   <property name="leftMargin"><number>6</number></property>
+   <property name="topMargin"><number>6</number></property>
+   <property name="rightMargin"><number>6</number></property>
+   <property name="bottomMargin"><number>6</number></property>
+   <item>
+    <widget class="QSplitter" name="main_split">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+     <property name="childrenCollapsible"><bool>false</bool></property>
+     <property name="handleWidth"><number>7</number></property>
+     <property name="toolTip"><string>Drag the handle between the controls and the charts to resize them</string></property>
+     <widget class="QWidget" name="upper">
+      <layout class="QVBoxLayout" name="upper_lay" stretch="0,0,0,0,0,1">
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item>
+        <layout class="QHBoxLayout" name="head">
+         <item>
+          <widget class="QLabel" name="title">
+           <property name="text"><string>&lt;b&gt;name&lt;/b&gt; &amp;nbsp; driver &amp;nbsp; address</string></property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="head_stretch">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+           <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QLabel" name="status">
+           <property name="text"><string>disconnected</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_connect">
+           <property name="text"><string>Connect</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_disconnect">
+           <property name="text"><string>Disconnect</string></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="info">
+         <property name="text"><string/></property>
+         <property name="wordWrap"><bool>true</bool></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="read_box">
+         <property name="title"><string>Readings</string></property>
+         <layout class="QGridLayout" name="readings"/>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="ctrl_box">
+         <property name="title"><string>Control</string></property>
+         <layout class="QVBoxLayout" name="ctrl_lay">
+          <item>
+           <layout class="QHBoxLayout" name="ctrl_head">
+            <item>
+             <spacer name="ctrl_head_stretch">
+              <property name="orientation"><enum>Qt::Horizontal</enum></property>
+              <property name="sizeHint" stdset="0"><size><width>40</width><height>10</height></size></property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btn_update">
+              <property name="text"><string>Update settings</string></property>
+              <property name="toolTip"><string>Read every setting below from the instrument again (queries only), e.g. after a change on its front panel</string></property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QFormLayout" name="form"/>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="foot">
+         <item>
+          <widget class="QCheckBox" name="live">
+           <property name="text"><string>Live</string></property>
+           <property name="checked"><bool>true</bool></property>
+           <property name="toolTip"><string>Poll the readings at the interval (settings: Update settings)</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QDoubleSpinBox" name="interval">
+           <property name="suffix"><string> s</string></property>
+           <property name="toolTip"><string>Time between polls</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_read">
+           <property name="text"><string>Read now</string></property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="foot_stretch">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+           <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_safe">
+           <property name="text"><string>Safe state</string></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <spacer name="upper_stretch">
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+         <property name="sizeHint" stdset="0"><size><width>10</width><height>0</height></size></property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QSplitter" name="charts_split">
+      <property name="orientation"><enum>Qt::Vertical</enum></property>
+      <property name="childrenCollapsible"><bool>false</bool></property>
+      <property name="handleWidth"><number>7</number></property>
+      <property name="toolTip"><string>Live charts: up to four, one per reading channel, each closed until clicked. Drag the handles between open charts to resize them</string></property>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <author>GeneralMeasurements</author>
+ <comment>Instrument Server main window (InstrumentServer). Row 0 of the `grid` layout is
+the column headers; the code adds one row per instrument below it (address, name,
+driver, connection light, Connect/Disconnect, Open panel). Actions are connected in
+code by name: actionOpen, actionSave, actionSaveAs, actionExit, actionGeneralMeasurement.</comment>
+ <class>InstrumentServer</class>
+ <widget class="QMainWindow" name="InstrumentServer">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1000</width><height>600</height></rect>
+  </property>
+  <property name="windowTitle"><string>Instrument Server</string></property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="central_lay">
+    <item>
+     <widget class="QSplitter" name="split">
+      <property name="orientation"><enum>Qt::Vertical</enum></property>
+      <widget class="QWidget" name="top">
+       <layout class="QVBoxLayout" name="top_lay">
+        <property name="leftMargin"><number>0</number></property>
+        <property name="topMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <property name="bottomMargin"><number>0</number></property>
+        <item>
+         <widget class="QScrollArea" name="table_scroll">
+          <property name="widgetResizable"><bool>true</bool></property>
+          <widget class="QWidget" name="table">
+           <property name="geometry"><rect><x>0</x><y>0</y><width>980</width><height>380</height></rect></property>
+           <layout class="QGridLayout" name="grid" columnstretch="0,1,0,0,0,0">
+            <item row="0" column="0"><widget class="QLabel" name="head_address"><property name="text"><string>&lt;b&gt;Address&lt;/b&gt;</string></property></widget></item>
+            <item row="0" column="1"><widget class="QLabel" name="head_name"><property name="text"><string>&lt;b&gt;Name&lt;/b&gt;</string></property></widget></item>
+            <item row="0" column="2"><widget class="QLabel" name="head_driver"><property name="text"><string>&lt;b&gt;Driver&lt;/b&gt;</string></property></widget></item>
+            <item row="0" column="3"><widget class="QLabel" name="head_connection"><property name="text"><string>&lt;b&gt;Connection&lt;/b&gt;</string></property></widget></item>
+            <item row="0" column="4"><widget class="QLabel" name="head_connect"><property name="text"><string/></property></widget></item>
+            <item row="0" column="5"><widget class="QLabel" name="head_panel"><property name="text"><string/></property></widget></item>
+           </layout>
+          </widget>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="add_row">
+          <item>
+           <widget class="QPushButton" name="btn_add">
+            <property name="enabled"><bool>false</bool></property>
+            <property name="text"><string>Add instrument</string></property>
+            <property name="toolTip"><string>Not available yet: add instruments to the config file for now</string></property>
+           </widget>
+          </item>
+          <item><spacer name="add_stretch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QTextEdit" name="log_view">
+       <property name="readOnly"><bool>true</bool></property>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry"><rect><x>0</x><y>0</y><width>1000</width><height>22</height></rect></property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title"><string>&amp;File</string></property>
+    <addaction name="actionOpen"/>
+    <addaction name="actionSave"/>
+    <addaction name="actionSaveAs"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
+   </widget>
+   <widget class="QMenu" name="menuWindow">
+    <property name="title"><string>&amp;Window</string></property>
+    <addaction name="actionGeneralMeasurement"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuWindow"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionOpen">
+   <property name="text"><string>&amp;Open…</string></property>
+   <property name="shortcut"><string>Ctrl+O</string></property>
+  </action>
+  <action name="actionSave">
+   <property name="text"><string>&amp;Save</string></property>
+   <property name="shortcut"><string>Ctrl+S</string></property>
+  </action>
+  <action name="actionSaveAs">
+   <property name="text"><string>Save &amp;as…</string></property>
+   <property name="shortcut"><string>Ctrl+Shift+S</string></property>
+  </action>
+  <action name="actionExit">
+   <property name="text"><string>E&amp;xit</string></property>
+  </action>
+  <action name="actionGeneralMeasurement">
+   <property name="text"><string>&amp;General Measurement (layout preview)</string></property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

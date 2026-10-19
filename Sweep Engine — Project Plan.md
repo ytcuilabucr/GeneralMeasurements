@@ -60,14 +60,22 @@ Five layers, each talking only to its neighbours: devices know hardware, plans a
 Config builds the devices and the plan drives the runner; sinks and watchdogs only ever see events, so adding an output or a safety check never touches the runner.
 
 ```
-generalmeasurements/
+gmcore/
   devices/   protocols.py, sim.py, <one module per instrument>
   plans/     axes.py (linear/log/list/snake), scan.py
   engine/    runner.py, fly.py, events.py, bus.py, control.py, safety.py
   sinks/     hdf5.py, liveplot.py, notify.py, log.py
   config/    schema.py (pydantic), loader.py, registry.py
   cli.py
+  gui/       forms/ (every Qt Designer form), common/ (shared panels, widgets,
+             worker, hub; dedicated_panels/), server/ (Instrument Server),
+             measurement/ (General Measurement), legacy/ (superseded windows)
+Instrument config/   the user's instrument configs
+tests/fixtures/      the tests' own copies of the configs
 ```
+
+The core (everything outside `gui/`) is shared by the CLI, the Instrument
+Server and General Measurement; `gui/common/` is shared by the two GUIs.
 
 ### Device contract
 
@@ -126,7 +134,7 @@ One HDF5 file per run, laid out on the scan grid so it opens directly in Python 
 
 - Fly-mode runs store data as 1D streams (`/data/<field>` with shape `(n,) + field_shape`), since the point count isn't known in advance.
 - `schema_version` is bumped on any layout change; readers check it.
-- A small `generalmeasurements.load(path)` returns an `xarray.Dataset` with axes as coordinates and units as attributes.
+- A small `gmcore.load(path)` returns an `xarray.Dataset` with axes as coordinates and units as attributes.
 - Naming convention for files and samples is decided once and enforced by the writer (see open questions).
 
 ## Configuration and instrument inventory
@@ -139,12 +147,10 @@ name = "cryostat-A"
 shutdown_order = ["gate", "bias", "magnet"]
 
 [devices.gate]
-driver = "keithley_24xx"
-model = "2400"
+driver = "keithley_2400"
 resource = "GPIB0::24::INSTR"
 compliance = 1e-9          # A in volt mode, V in curr mode
 limits = [-10.0, 10.0]
-max_rate = 0.5             # V/s (A/s), enforced inside set()
 
 [devices.vxx]
 driver = "keithley_2000"
@@ -154,13 +160,13 @@ nplc = 10
 
 Plans live in separate TOML or Python files and refer to devices by role name only.
 
-**Instrument inventory** (status as of 2026-10-16). GPIB addresses are from a bus scan of the lab PC; `station.lab.toml` lists them. "Comms verified" = live tests pass with outputs off; "queries only" = reply formats read from the instrument, writes not yet sent.
+**Instrument inventory** (status as of 2026-10-16). GPIB addresses are from a bus scan of the lab PC; `Instrument config/lab.toml` lists them. "Comms verified" = live tests pass with outputs off; "queries only" = reply formats read from the instrument, writes not yet sent.
 
 | Role | Instrument | Interface | Contract | Python library | Adapter status |
 | --- | --- | --- | --- | --- | --- |
-| Voltage source | Keithley 2400 (GPIB 26) | GPIB | Movable | pyvisa | `keithley_24xx`; **comms verified**; output-on read not yet tested |
-| Current source | Keithley 2401 (GPIB 22) | GPIB | Movable | pyvisa | `keithley_24xx` (`mode = "curr"`); **comms verified** |
-| Voltage source | Keithley 2410 / 2450 | GPIB | Movable | pyvisa | `keithley_24xx`; not on the bus, unverified |
+| Voltage source | Keithley 2400 (GPIB 26) | GPIB | Movable | pyvisa | `keithley_2400`; **comms verified**; output-on read not yet tested |
+| Current source | Keithley 2401 (GPIB 22) | GPIB | Movable | pyvisa | `keithley_2401` (`mode = "curr"`); **comms verified** |
+| Voltage source | Keithley 2410 / 2450 | GPIB | Movable | pyvisa | `keithley_2410`, `keithley_2450`; not on the bus, unverified |
 | Voltmeter | Keithley 2000 DMM (GPIB 11) | GPIB | Readable | pyvisa | `keithley_2000`; **comms verified** |
 | Voltmeter | Agilent DMM (model?) | USB/LAN | Readable | pyvisa | Not started; not found on GPIB |
 | Magnet supply | Lake Shore 625 (GPIB 12) | GPIB | Rampable | pyvisa | `lakeshore_625`; queries only |
@@ -170,6 +176,26 @@ Plans live in separate TOML or Python files and refer to devices by role name on
 | Monochromator / laser | ? | ? | Movable | ? | Not started |
 | Unknown | GPIB 3, 4 | GPIB | ? | ? | Listed by the bus scan but no reply to `*IDN?` or serial poll |
 
+## Applications: Instrument Server and General Measurement
+
+The work is split between two main GUIs, run as two main windows of one program (one process):
+
+- **Instrument Server** connects to the instruments and owns every session.
+  - It loads an instrument config from `Instrument config/*.toml`: the instrument list, each with its address, working name, driver and settings (limits, rates, compliance).
+  - Its main window is a table with one row per instrument: address | name | driver | connection light | Connect / Disconnect | Open panel.
+  - **Open panel** shows the instrument's dedicated panel if it has one (the cryostat instruments). Otherwise it shows the standard panel built from the driver definition, and failing that a generic panel.
+  - A fixed File menu opens and saves the config (Open, Save, Save As).
+  - **Add instrument** is planned.
+- **General Measurement** generates and modifies measurement sequences (plans) from the instruments the server has connected, and runs them through the runner on those same sessions. Not started.
+
+Rules:
+
+- **Single owner.** Only the Instrument Server opens and closes instrument sessions. General Measurement uses the server's devices and never opens its own. Closing General Measurement leaves the connections up; closing the server asks first.
+- **Names are working names.** The name in the server's table, by default the model and an index such as `Keithley 2400 - 1`, is what sequences and data keys use (`Keithley 2400 - 1.v`). A name can be changed only while the instrument is disconnected. It can't contain `.` or `/` (they separate data keys and HDF5 paths), and it must be unique.
+- **One program.** The two windows share the device objects, the async worker and the data hub directly, with no network link between them. The localhost control server stays for remote pause and abort.
+- **Predecessors.** The Instrument Server replaces the driver test bench and the per-type station windows (`gm gui`). Both are kept in `gui/legacy/` until the server covers them. The monitor and chart windows there may be reused by General Measurement.
+- **Focus.** The Instrument Server comes first. General Measurement follows on the same core and the same shared GUI parts (`gui/common/`); for now it is a layout preview, sketched in Qt Designer.
+
 ## Development phases
 
 Build the whole pipeline on simulated hardware first (phases 0 to 2), then add real instruments one at a time; each phase ends with a check you can run.
@@ -178,7 +204,7 @@ Build the whole pipeline on simulated hardware first (phases 0 to 2), then add r
 | --- | --- | --- | --- |
 | 0. Foundations | Repo, uv project, ruff, pyright, pytest, CI; protocols module; config schema skeleton | CI green on an empty test suite; a sample station TOML validates | **Mostly done.** CI runs ruff, pytest and station validation on Windows and Linux; pyright is report-only (55 errors in standard mode, not yet strict). No uv lockfile or pre-commit yet. |
 | 1. Core on simulators | Sim devices (magnet with real ramp time, DMM returning f(setpoints), noisy lock-in); axes and point iterator; Scan validation; stepped runner; bus; controller | A 2D snake scan on sims runs end to end; abort mid-scan triggers safe\_state; out-of-limit plans are rejected before any move | **Done** (covered by tests). |
-| 2. Data and provenance | HDF5 sink, provenance capture, `generalmeasurements.load()`, resume from last point | Killing the process mid-run leaves a readable file with status; resume finishes it; the file opens in Igor and xarray | **Done on sims** except the Igor check, not yet tried. |
+| 2. Data and provenance | HDF5 sink, provenance capture, `gmcore.load()`, resume from last point | Killing the process mid-run leaves a readable file with status; resume finishes it; the file opens in Igor and xarray | **Done on sims** except the Igor check, not yet tried. |
 | 3. First real instruments | Keithley 24xx source and voltmeter adapters, Agilent DMM adapter, per-adapter hardware tests | I-V on a known resistor matches Ohm's law within instrument spec; swapping the voltmeter needs only a TOML edit | **In progress.** Communication with the 2400, 2401 and 2000 verified on hardware (live tests, golden transcripts; four comms bugs found and fixed). No Agilent adapter. Ohm's-law check (output on, dummy resistor) not run. |
 | 4. Safety and control | Ramp-rate enforcement, watchdogs, shutdown order, CLI pause/resume/abort, notifier sink | Compliance trip aborts the run and ramps gates to zero; pause holds state for 30 min and resumes cleanly | **Done on sims/fakes.** Not checked on hardware; 30-min pause not tested. |
 | 5. Slow axes and fly mode | Magnet and temperature controller adapters (Rampable), fly runner, readback recording | A field fly sweep and a stepped temperature series both produce correct files | **Partial.** Fly runner, readback and sim magnet done. Lake Shore 625 and 335 adapters written (read-only checks, queries verified); no write sent to either yet. SR830/SR850 lock-in adapters written early. |
@@ -257,3 +283,10 @@ The costliest failures are a damaged sample and silently wrong data, so most mit
 | 2026-10-17 | Rename the project to GeneralMeasurements: import package `generalmeasurements`, CLI `gm` | Matches the repository name. The import package is lowercase, per PEP 8 |
 | 2026-10-17 | GUI on PySide6 + Qt Advanced Docking System. One window per instrument type, with same-type instruments docked together; a station window for the overview | Instruments of different kinds sit on different parts of the screen (or different monitors), while similar ones (the Keithleys) can be compared side by side. QtAds gives splitting, floating and saved layouts, which QDockWidget does not handle well across several windows. PySide6 is the official binding (LGPL) and the one QtAds ships wheels for |
 | 2026-10-17 | Driver properties are declared in TOML definitions (`devices/defs/`), after Labber's `.ini` but with maps instead of numbered keys and explicit rate units. A setting that changes other properties' units or roles is a mode, with one definition file per mode; the mode is fixed while connected, and the driver's `switch_mode()` changes it | One standard panel and `describe()` come from a declarative list, so new instruments need no GUI code. One file per mode keeps every file flat (fixed units and limits) instead of per-mode conditionals inside each property. Switching through the driver keeps the safety sequence (ramp to 0, output off, reconfigure) in one place |
+| 2026-10-18 | Keithley SMUs set the level in one step everywhere (no Python ramp, no `max_rate`); NPLC bounds live in the model's .toml and the driver reads them | Requested by the operator: direct control, and one place for each property's bounds. Trade-off accepted: scan points, Safe state and output Off now step the output, so samples that need slow changes must be protected by the plan (small steps) or by not using these instruments for them |
+| 2026-10-18 | One instrument model = one driver module + its own definition files; no code shared between drivers (the Keithley 2400, 2401, 2410 and 2450 each carry a full copy) | A clear rule for every future driver: a model can be read, changed and tested on its own, and a fix for one can't break another. The cost is that a change to shared behaviour goes into each copy |
+| 2026-10-18 | One driver per Keithley SMU model (`keithley_2400/2401/2410/2450`) on a shared SCPI engine, with each model's ranges and limits taken from the Keithley datasheets and manuals; source and measure ranges as level-1 drop-downs; the source range changes only with the output off. Every control was checked against its manual (`docs/manual-review.md`) | The models differ in ranges (2401: no 200 V; 2410: 1000 V and a 20 mA range; 2450: 20 mV, 10 nA, 100 nA) and in power envelope, so one generic table hid real limits. A range change glitches the output (manual: 100–250 mV overshoot). A lower measure range lowers the effective compliance (range compliance), so it can change while the output is on |
+| 2026-10-18 | Python package renamed `generalmeasurements` → `gmcore`; all forms in one `gui/forms/`; `gui/common/instruments/` → `dedicated_panels/`; `tests/configs/` → `tests/fixtures/` | The package had the repository's name (identical on Windows, which ignores case), and four sibling `ui/` folders and three "config" folders were easy to mix up. The project, the CLI (`gm`, `generalmeasurements`) and the HDF5 key `generalmeasurements_version` keep their names |
+| 2026-10-18 | Window layouts are Qt Designer forms loaded at runtime (QUiLoader into the window object), not code or `pyside6-uic` output | Layouts can be edited without touching code; loading costs a few ms per window, about the same as building it in code; no build step to forget. Dynamic rows (instruments, definition properties) stay in code |
+| 2026-10-18 | `gui/` split into `common/`, `server/`, `measurement/`, `legacy/`; core packages unchanged; configs in `Instrument config/`, the tests' copies in `tests/fixtures/` | Focus on the Instrument Server first, with General Measurement on the same core later. Keeping the core in place keeps every import and plan file working. The tests no longer depend on configs that users edit and the server saves |
+| 2026-10-18 | Two main GUIs, Instrument Server (connections) and General Measurement (sequences), as two windows of one program. Instrument names in the config are working names used by sequences and data | One owner per session (the server) without inter-process plumbing. Names users choose are the names they see in data. Config files live in `Instrument config/` and keep the station schema, so `gm run --station` works on them too |

@@ -1,0 +1,82 @@
+# Stanford Research SR830 / SR850 lock-in amplifiers (same command set here).
+
+drivers = ["sr830", "sr850"]
+label = "SRS {model} lock-in"
+safe = "Nothing hazardous: the reference keeps running"
+groups = ["Settings", "Reference"]
+
+[properties.x]
+level = 0
+label = "{name} X"
+unit = "V"
+
+[properties.y]
+level = 0
+label = "{name} Y"
+unit = "V"
+
+[properties.r]
+level = 1
+label = "{name} R"
+unit = "V"
+
+[properties.theta]
+level = 1
+label = "{name} phase"
+unit = "deg"
+
+[properties.sensitivity]
+level = 0
+kind = "enum"
+access = "both"
+group = "Settings"
+label = "Sensitivity"
+unit = "V"
+choices_attr = "SENSITIVITY"
+get = "get_sensitivity"
+set = "set_sensitivity"
+
+[properties.time_constant]
+level = 0
+kind = "enum"
+access = "both"
+group = "Settings"
+label = "Time constant"
+unit = "s"
+choices_attr = "TIME_CONSTANT"
+get = "get_time_constant"
+set = "set_time_constant"
+
+[properties.frequency]
+level = 1
+group = "Reference"
+label = "Frequency"
+unit = "Hz"
+get = "snapshot.frequency"
+
+[properties.amplitude]
+level = 1
+group = "Reference"
+label = "Amplitude"
+unit = "V"
+get = "snapshot.amplitude"
+
+[properties.phase]
+level = 2
+group = "Reference"
+label = "Phase"
+unit = "deg"
+get = "snapshot.phase"
+
+[properties.idn]
+level = 2
+kind = "str"
+group = "Reference"
+label = "Identity"
+get = "snapshot.idn"
+
+[properties.auto_phase]
+level = 1
+kind = "action"
+label = "Auto phase"
+set = "auto_phase"

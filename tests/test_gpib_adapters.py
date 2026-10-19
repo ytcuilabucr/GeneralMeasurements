@@ -7,8 +7,8 @@ import math
 
 import pytest
 
-from generalmeasurements.config import load_station
-from generalmeasurements.devices import (DriverError, FakeTransport, Gigatronics2420B, LakeShore335,
+from gmcore.config import load_station
+from gmcore.devices import (DriverError, FakeTransport, Gigatronics2420B, LakeShore335,
                               LakeShore625)
 
 # -- Lake Shore 335 ----------------------------------------------------------
@@ -197,5 +197,5 @@ async def test_gt_safe_state_rf_off():
 
 # -- config ------------------------------------------------------------------
 def test_lab_station_validates():
-    cfg = load_station("station.lab.toml")
+    cfg = load_station("tests/fixtures/lab.toml")
     assert {"temp", "magnet", "rf", "lockin"} <= set(cfg.devices)

@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <author>GeneralMeasurements</author>
+ <comment>Cryomagnetics LM-510 helium level panel (LM510Panel), after the legacy
+HeliumMonitor.vi. Cards are QFrames with card=true and labels &lt;frame&gt;_caption / _value /
+_sub. The fit combo's texts must match FITS in the code. Accent colour #17a589.</comment>
+ <class>LM510Panel</class>
+ <widget class="QWidget" name="LM510Panel">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>760</width><height>820</height></rect>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QLabel[panelTitle=&quot;true&quot;] { background: #17a589; color: white; padding: 6px 10px; border-radius: 4px; font-size: 12pt; }
+QGroupBox { border: 1px solid #17a589; border-radius: 6px; margin-top: 1.1em; padding: 6px; }
+QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; color: #17a589; font-weight: bold; }
+QFrame[card=&quot;true&quot;] { border: 1px solid #17a589; border-left: 6px solid #17a589; border-radius: 6px; background: palette(base); }</string>
+  </property>
+  <layout class="QVBoxLayout" name="root" stretch="0,0,1,0,0">
+   <item>
+    <layout class="QHBoxLayout" name="head">
+     <item>
+      <widget class="QLabel" name="title">
+       <property name="text"><string>&lt;b&gt;name&lt;/b&gt; &amp;nbsp; lm510 &amp;nbsp; address</string></property>
+       <property name="panelTitle" stdset="0"><bool>true</bool></property>
+      </widget>
+     </item>
+     <item><spacer name="head_stretch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QLabel" name="status"><property name="text"><string>disconnected</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_connect"><property name="text"><string>Connect</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_disconnect"><property name="text"><string>Disconnect</string></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="top" stretch="0,1">
+     <item><widget class="DewarGauge" name="dewar"/></item>
+     <item>
+      <layout class="QVBoxLayout" name="right">
+       <item>
+        <layout class="QHBoxLayout" name="cards">
+         <item>
+          <widget class="QFrame" name="cardLevel">
+           <property name="card" stdset="0"><bool>true</bool></property>
+           <layout class="QVBoxLayout" name="cardLevel_lay">
+            <item><widget class="QLabel" name="cardLevel_caption"><property name="text"><string>&lt;b&gt;Helium level&lt;/b&gt;</string></property></widget></item>
+            <item><widget class="QLabel" name="cardLevel_value"><property name="styleSheet"><string notr="true">font-size: 32pt; font-family: Consolas, monospace;</string></property><property name="text"><string>—</string></property></widget></item>
+            <item><widget class="QLabel" name="cardLevel_sub"><property name="styleSheet"><string notr="true">color: palette(mid);</string></property><property name="text"><string/></property></widget></item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QFrame" name="cardBoil">
+           <property name="card" stdset="0"><bool>true</bool></property>
+           <layout class="QVBoxLayout" name="cardBoil_lay">
+            <item><widget class="QLabel" name="cardBoil_caption"><property name="text"><string>&lt;b&gt;Boil-off&lt;/b&gt;</string></property></widget></item>
+            <item><widget class="QLabel" name="cardBoil_value"><property name="styleSheet"><string notr="true">font-size: 20pt; font-family: Consolas, monospace;</string></property><property name="text"><string>—</string></property></widget></item>
+            <item><widget class="QLabel" name="cardBoil_sub"><property name="styleSheet"><string notr="true">color: palette(mid);</string></property><property name="text"><string/></property></widget></item>
+            <item>
+             <layout class="QHBoxLayout" name="cardBoil_extra">
+              <item><widget class="QLabel" name="fit_label"><property name="text"><string>fit over</string></property></widget></item>
+              <item>
+               <widget class="QComboBox" name="fit">
+                <property name="toolTip"><string>Linear fit over this much history</string></property>
+                <property name="currentIndex"><number>1</number></property>
+                <item><property name="text"><string>1 h</string></property></item>
+                <item><property name="text"><string>6 h</string></property></item>
+                <item><property name="text"><string>24 h</string></property></item>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QFrame" name="cardLeft">
+           <property name="card" stdset="0"><bool>true</bool></property>
+           <layout class="QVBoxLayout" name="cardLeft_lay">
+            <item><widget class="QLabel" name="cardLeft_caption"><property name="text"><string>&lt;b&gt;Until low mark&lt;/b&gt;</string></property></widget></item>
+            <item><widget class="QLabel" name="cardLeft_value"><property name="styleSheet"><string notr="true">font-size: 20pt; font-family: Consolas, monospace;</string></property><property name="text"><string>—</string></property></widget></item>
+            <item><widget class="QLabel" name="cardLeft_sub"><property name="styleSheet"><string notr="true">color: palette(mid);</string></property><property name="text"><string/></property></widget></item>
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="info">
+         <property name="text"><string/></property>
+         <property name="wordWrap"><bool>true</bool></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="mode_box">
+         <property name="title"><string>Measurement</string></property>
+         <layout class="QFormLayout" name="mode_form">
+          <item row="0" column="0"><widget class="QLabel" name="mode_label"><property name="text"><string>Mode</string></property></widget></item>
+          <item row="0" column="1">
+           <layout class="QHBoxLayout" name="mode_row">
+            <item><widget class="QRadioButton" name="mode_sh"><property name="text"><string>Sample/Hold</string></property></widget></item>
+            <item><widget class="QRadioButton" name="mode_c"><property name="text"><string>Continuous</string></property><property name="toolTip"><string>Continuous keeps the sensor heated: higher boil-off</string></property></widget></item>
+            <item><spacer name="mode_stretch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item row="1" column="0"><widget class="QLabel" name="meter_interval_label"><property name="text"><string>Meter interval</string></property></widget></item>
+          <item row="1" column="1">
+           <layout class="QHBoxLayout" name="interval_row">
+            <item>
+             <widget class="QDoubleSpinBox" name="meter_interval">
+              <property name="decimals"><number>1</number></property>
+              <property name="minimum"><double>0.1</double></property>
+              <property name="maximum"><double>5999.9</double></property>
+              <property name="value"><double>60</double></property>
+              <property name="suffix"><string> min</string></property>
+              <property name="toolTip"><string>The meter takes up to 99:59:59. 0 would mean "sample continuously" (constant boil-off), so the minimum here is 6 s.</string></property>
+             </widget>
+            </item>
+            <item><widget class="QPushButton" name="btn_set_interval"><property name="text"><string>Set</string></property></widget></item>
+            <item><spacer name="interval_stretch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item row="2" column="1">
+           <layout class="QHBoxLayout" name="measure_row">
+            <item><widget class="QPushButton" name="btn_measure"><property name="text"><string>Measure now</string></property><property name="toolTip"><string>Start one measurement (heats the sensor briefly)</string></property></widget></item>
+            <item><widget class="QLabel" name="last"><property name="text"><string>—</string></property></widget></item>
+            <item><widget class="QPushButton" name="btn_update"><property name="text"><string>Update settings</string></property><property name="toolTip"><string>Read the settings from the instrument again (queries only), e.g. after a change on its front panel</string></property></widget></item>
+            <item><spacer name="measure_stretch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item><spacer name="right_stretch"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>10</width><height>20</height></size></property></spacer></item>
+      </layout>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="TimeChart" name="chart">
+     <property name="yLabel" stdset="0"><string>helium level</string></property>
+     <property name="curves_spec" stdset="0"><string>level=#48c9b0</string></property>
+    </widget>
+   </item>
+   <item><widget class="CsvLog" name="log"/></item>
+   <item>
+    <layout class="QHBoxLayout" name="foot">
+     <item><widget class="QCheckBox" name="live"><property name="text"><string>Live</string></property><property name="checked"><bool>true</bool></property></widget></item>
+     <item><widget class="QDoubleSpinBox" name="interval"><property name="suffix"><string> s</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_read"><property name="text"><string>Read now</string></property></widget></item>
+     <item><spacer name="foot_stretch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QPushButton" name="btn_safe"><property name="text"><string>Safe state</string></property></widget></item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget><class>DewarGauge</class><extends>QWidget</extends><header>gmcore.gui.common.widgets</header></customwidget>
+  <customwidget><class>TimeChart</class><extends>QWidget</extends><header>gmcore.gui.common.widgets</header></customwidget>
+  <customwidget><class>CsvLog</class><extends>QWidget</extends><header>gmcore.gui.common.widgets</header></customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

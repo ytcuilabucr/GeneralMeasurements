@@ -1,0 +1,73 @@
+# Keithley 2400 SourceMeter (driver keithley_2400.py).
+#
+# The source function is a mode: keithley_2400_volt.toml and
+# keithley_2400_curr.toml add the level, the compliance and the ranges in
+# their units. The model's figures (ranges, output and power limits) are in
+# the driver; the range drop-downs read them through `source_ranges` /
+# `sense_ranges`. The station's limits narrow the model's.
+
+drivers = ["keithley_2400"]
+label = "Keithley 2400 SMU"
+mode_attr = "mode"
+modes = { volt = "Voltage source", curr = "Current source" }
+attach = "sync"                    # adopt output state and level (queries only)
+check_mode = "active_mode"         # the unit's present source function
+switch = "switch_mode"
+switch_confirm = """Switch {name} to {mode_label}?
+
+The level goes to 0 (one step) and the output turns OFF. Then the unit is \
+reset (*RST) and configured with the station's {mode} settings."""
+switch_settings = ["compliance", "limits"]
+read_if = "output"                 # with the output off the unit never replies to :READ?
+safe = "Level 0 (one step), then output OFF"
+groups = ["Source", "Measure"]
+
+[properties.output]
+level = 0
+kind = "bool"
+access = "both"
+group = "Source"
+label = "Output"
+get = "output_on"
+set = "set_output"
+confirm = """Turn the output ON at level 0?
+
+Only with a known load on the terminals."""
+confirm_when = [true]
+tooltip = "ON: level 0, then output on. OFF: level 0, then output off."
+
+[properties.v]
+level = 0
+label = "{name} voltage"
+unit = "V"
+
+[properties.i]
+level = 0
+label = "{name} current"
+unit = "A"
+
+[properties.in_compliance]
+level = 0
+kind = "status"
+key = "compliance"
+label = "{name} in compliance (0/1)"
+when = "check_compliance"
+
+[properties.nplc]
+level = 2
+access = "both"
+label = "NPLC"
+group = "Measure"
+get = "nplc"
+set = "set_nplc"
+min = 0.01                         # the manual's span; the driver enforces these
+max = 10.0
+tooltip = "Integration time of the measurement, in power-line cycles"
+
+[properties.configure]
+level = 1
+kind = "action"
+label = "Configure (reset)…"
+set = "configure"
+confirm = """Configure sends *RST: the output turns OFF and all settings return to \
+the station's values. Continue?"""

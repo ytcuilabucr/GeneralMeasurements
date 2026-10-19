@@ -1,0 +1,32 @@
+# Instrument config template: copy it, then set the addresses, limits and
+# rates for your setup. Each [devices."<name>"] binds a working name to a
+# driver; sequences and data use the name ("Keithley 2450 - 1.v").
+# Driver keys: gmcore/config/schema.py and docs/adapters/.
+
+[station]
+name = "bench"
+shutdown_order = ["Keithley 2450 - 1", "Keithley 2400 - 1"]
+
+[devices."Keithley 2450 - 1"]
+driver = "keithley_2450"
+resource = "GPIB0::18::INSTR"
+compliance = 1e-9                  # A in volt mode, V in curr mode
+limits = [-10.0, 10.0]
+
+[devices."Keithley 2400 - 1"]
+driver = "keithley_2400"
+resource = "GPIB0::24::INSTR"
+compliance = 1e-6
+limits = [-1.0, 1.0]
+
+[devices."Keithley 2000 - 1"]
+driver = "keithley_2000"
+resource = "GPIB0::16::INSTR"
+nplc = 10
+
+[devices."SR830 - 1"]
+driver = "sr830"
+resource = "GPIB0::8::INSTR"
+frequency = 17.77
+time_constant = 0.3
+sensitivity = 1e-3

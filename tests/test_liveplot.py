@@ -1,9 +1,9 @@
 import numpy as np
 
-from generalmeasurements.devices.sim import SimLockin, SimMagnet, SimSource
-from generalmeasurements.engine import Bus, run
-from generalmeasurements.plans import Axis, FlyScan, Scan, linear
-from generalmeasurements.sinks import LivePlotSink, PlotBuffer
+from gmcore.devices.sim import SimLockin, SimMagnet, SimSource
+from gmcore.engine import Bus, run
+from gmcore.plans import Axis, FlyScan, Scan, linear
+from gmcore.sinks import LivePlotSink, PlotBuffer
 
 
 class FakeChannel:

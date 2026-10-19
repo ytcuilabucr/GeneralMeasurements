@@ -1,7 +1,7 @@
 # Driver definitions
 
 Each driver's properties are declared in a TOML file in
-`generalmeasurements/devices/defs/`. The file says **what** the properties
+`gmcore/devices/defs/`. The file says **what** the properties
 are: kind, units, limits, who reads and who writes them, and what asks for a
 confirmation. The driver's Python says **how**: `get`, `set`, `attach` and so
 on name its methods or attributes. The design follows Labber's instrument
@@ -27,7 +27,7 @@ its own file:
 
 | Driver | Mode (station key) | Files |
 | --- | --- | --- |
-| `keithley_24xx` | `mode`: `volt`, `curr` | `keithley_24xx.toml` + `keithley_24xx_volt.toml`, `_curr.toml` |
+| `keithley_2400`, `keithley_2401`, `keithley_2410`, `keithley_2450` | `mode`: `volt`, `curr` | per model: `keithley_<model>.toml` + `keithley_<model>_volt.toml`, `_curr.toml` |
 | `keithley_2000` | `function`: `volt`, `curr`, `res`, `fres` | `keithley_2000.toml` + one file per function |
 | `gigatronics_2420b` | `axis`: `freq`, `power` | `gigatronics_2420b.toml` + `_freq.toml`, `_power.toml` |
 | `lakeshore_335`, `lakeshore_625`, `lm510`, `sr830` / `sr850` | none | one file each (the lock-ins share `srs_lockin.toml`) |
@@ -57,8 +57,8 @@ its own file:
 ## File layout
 
 ```toml
-drivers = ["keithley_24xx"]        # driver names this file serves
-label = "Keithley {d.model} SMU"   # panel title (template)
+drivers = ["keithley_2410"]        # the driver this file serves (one model, one file)
+label = "Keithley 2410 SMU"        # panel title (template)
 info = "..."                       # one line under the title (template)
 mode_attr = "mode"                 # driver attribute and station key holding the mode
 modes = { volt = "Voltage source", curr = "Current source" }
@@ -81,6 +81,7 @@ groups = ["Source", "Measure"]     # display order of the property groups
 | --- | --- |
 | `kind` | `float` (default), `int`, `bool`, `enum`, `str`, `status` (a 0/1 light), `action` (a button, no value) |
 | `access` | `read` (default), `write` or `both` |
+| `level` | how often it is used: `0` essential (always on the panel), `1` expanded, `2` all (see [Levels](#levels)) |
 | `label`, `unit`, `tooltip`, `group` | display; `label` and `unit` are templates |
 | `key` | `read()` key suffix: the default is the id, and `""` means the device name itself (`temp`, `dmm`) |
 | `poll` | `live` = the value comes from `read()` (the default when there is no `get`); `connect` = from `get`, read on connect and after every write |
@@ -88,7 +89,7 @@ groups = ["Source", "Measure"]     # display order of the property groups
 | `set` | a method taking the value; for an action, a method with no argument |
 | `choices` | enum: `{label = value}`, one map, so labels and wire values can't drift apart |
 | `choices_attr` | enum: a driver attribute holding a list of values instead (lock-in sensitivity table) |
-| `allow_auto` | `None` is valid, shown as "auto" (DMM range) |
+| `allow_auto` | `None` is valid, shown as "auto"; an enum's drop-down then starts with Auto (DMM and SMU ranges) |
 | `limits`, `min`, `max` | numbers, or the name of a driver attribute (`limits = "limits"`, `max = "max_power_dbm"`); shown on the panel, enforced by the driver |
 | `readback` | the property whose reading confirms this setting: the Keithley level reads back as `v` or `i`, depending on the mode |
 | `tolerance` | the difference from the readback that counts as reached (number or attribute) |
@@ -103,6 +104,27 @@ groups = ["Source", "Measure"]     # display order of the property groups
 Templates fill `{name}` and the driver's attributes, with attribute and index
 access and format specs: `"{d.model}"`, `"{limits[0]:g}"`.
 
+## Levels
+
+Every property says how often it is used, so the panel needn't show
+everything at once:
+
+| Level | Name | What goes there | Examples |
+| --- | --- | --- | --- |
+| 0 | Essential | what you watch or change in every session, and anything safety-relevant | SMU output, level and compliance light; lock-in X, Y, sensitivity, time constant; setpoint, heater range |
+| 1 | Expanded | changed now and then, or worth a look | SMU compliance and Configure; DMM NPLC and range; lock-in R, phase, reference frequency, Auto phase; magnet switch heater, errors |
+| 2 | All | rarely used, or read-only details | SMU NPLC; lock-in identity; Lake Shore PID; magnet supply limits; LM-510 high mark, sensor length |
+
+The standard panel always shows level 0. Level 1 is folded into a **More**
+toggle list, and level 2 into an **All** toggle inside it. Each level keeps
+its own readings, group headings and actions. Levels only change what is
+shown: every live property is still read, recorded and offered to the
+monitor and chart windows.
+
+Write `level` on every property, in the file that introduces it (a mode
+file only for the properties it adds). The model's default is 0, and
+`test_every_property_declares_its_level` checks the shipped files.
+
 ## Checks
 
 Loading a definition validates it with pydantic:
@@ -114,7 +136,10 @@ Loading a definition validates it with pydantic:
 - an enum without choices;
 - a `readback` or `interlock` naming no property;
 - `confirm_when` values that aren't among the choices;
-- duplicate `read()` keys.
+- duplicate `read()` keys;
+- a `level` other than 0, 1 or 2; an `interlock` at a higher level than the
+  property it locks (it would be folded away while the property is shown);
+  a `read_if` property above level 0 (it says why the readings stop).
 
 `tests/test_definitions.py` checks that every method, attribute and template
 field a definition names exists on its driver, in every mode, and that
@@ -126,5 +151,9 @@ reading the `get` properties only queries the instrument.
    `DEFINITION = "<file name>"` and `describe()` returning
    `definitions.describe(self)`.
 2. Write `defs/<driver>.toml`, plus one file per mode if it has modes.
-3. Map the driver to `DefinitionPanel` in `gui/panels.py` and to a window in
-   `WINDOW_OF_DRIVER`, or give it its own panel in `gui/instruments/`.
+3. Register it: its config class in `config/schema.py` (`DeviceCfg`, and
+   safe `DRIVER_DEFAULTS` if it moves anything), its builder and
+   `DRIVER_CLASSES` entry in `config/registry.py`, and its model name in
+   `MODEL_NAMES` (`gui/server/window.py`) for default names.
+4. The Instrument Server then shows it with the standard panel. For a panel of
+   its own, see [designer.md](designer.md) and `gui/common/dedicated_panels/`.

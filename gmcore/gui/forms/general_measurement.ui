@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <author>GeneralMeasurements</author>
+ <comment>General Measurement (sequence editor): LAYOUT SKETCH ONLY, nothing is wired yet.
+Instruments come from the Instrument Server (same program). A sequence is a tree of
+steps: loops and sweeps nest, reads sit at the innermost level. The sequence rows here
+are examples for the sketch, marked "(example)". Edit freely in Qt Designer.</comment>
+ <class>GeneralMeasurement</class>
+ <widget class="QMainWindow" name="GeneralMeasurement">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1280</width><height>820</height></rect>
+  </property>
+  <property name="windowTitle"><string>General Measurement — layout preview</string></property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="central_lay" stretch="0,1,0">
+    <item>
+     <widget class="QLabel" name="banner">
+      <property name="styleSheet"><string notr="true">background: #fdebd0; color: #7e5109; padding: 6px; border-radius: 4px;</string></property>
+      <property name="text"><string>Layout preview: General Measurement is not built yet, so nothing here runs. Edit gmcore/gui/forms/general_measurement.ui in Qt Designer to sketch it.</string></property>
+      <property name="wordWrap"><bool>true</bool></property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QSplitter" name="split_v">
+      <property name="orientation"><enum>Qt::Vertical</enum></property>
+      <widget class="QSplitter" name="split_h">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <widget class="QGroupBox" name="instruments_box">
+        <property name="title"><string>Instruments</string></property>
+        <layout class="QVBoxLayout" name="instruments_lay">
+         <item>
+          <widget class="QTreeWidget" name="instruments">
+           <property name="rootIsDecorated"><bool>true</bool></property>
+           <column><property name="text"><string>Instrument / property</string></property></column>
+           <column><property name="text"><string>Driver / unit</string></property></column>
+           <column><property name="text"><string>Connection</string></property></column>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="instruments_hint">
+           <property name="text"><string>From the Instrument Server. Drag a property into the sequence.</string></property>
+           <property name="wordWrap"><bool>true</bool></property>
+           <property name="styleSheet"><string notr="true">color: palette(mid);</string></property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QGroupBox" name="sequence_box">
+        <property name="title"><string>Sequence</string></property>
+        <layout class="QVBoxLayout" name="sequence_lay">
+         <item>
+          <widget class="QTreeWidget" name="sequence">
+           <property name="alternatingRowColors"><bool>true</bool></property>
+           <column><property name="text"><string>Step</string></property></column>
+           <column><property name="text"><string>Instrument</string></property></column>
+           <column><property name="text"><string>Property</string></property></column>
+           <column><property name="text"><string>From</string></property></column>
+           <column><property name="text"><string>To</string></property></column>
+           <column><property name="text"><string>Points</string></property></column>
+           <column><property name="text"><string>Settle</string></property></column>
+           <item>
+            <property name="text"><string>Loop (example)</string></property>
+            <property name="text"><string>Lake Shore 335 - 1</string></property>
+            <property name="text"><string>setpoint</string></property>
+            <property name="text"><string>2 K</string></property>
+            <property name="text"><string>10 K</string></property>
+            <property name="text"><string>5</string></property>
+            <property name="text"><string>stable</string></property>
+            <item>
+             <property name="text"><string>Sweep (example)</string></property>
+             <property name="text"><string>Keithley 2400 - 1</string></property>
+             <property name="text"><string>level</string></property>
+             <property name="text"><string>-1 V</string></property>
+             <property name="text"><string>1 V</string></property>
+             <property name="text"><string>201</string></property>
+             <property name="text"><string>50 ms</string></property>
+             <item>
+              <property name="text"><string>Read (example)</string></property>
+              <property name="text"><string>SR850 - 1</string></property>
+              <property name="text"><string>x, y</string></property>
+             </item>
+            </item>
+           </item>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="sequence_buttons">
+           <item><widget class="QPushButton" name="btn_add_sweep"><property name="text"><string>Add sweep</string></property></widget></item>
+           <item><widget class="QPushButton" name="btn_add_loop"><property name="text"><string>Add loop</string></property></widget></item>
+           <item><widget class="QPushButton" name="btn_add_read"><property name="text"><string>Add readings</string></property></widget></item>
+           <item><widget class="QPushButton" name="btn_remove"><property name="text"><string>Remove</string></property></widget></item>
+           <item><widget class="QPushButton" name="btn_up"><property name="text"><string>Up</string></property></widget></item>
+           <item><widget class="QPushButton" name="btn_down"><property name="text"><string>Down</string></property></widget></item>
+           <item><spacer name="sequence_buttons_stretch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QGroupBox" name="step_box">
+        <property name="title"><string>Step</string></property>
+        <layout class="QFormLayout" name="step_form">
+         <item row="0" column="0"><widget class="QLabel" name="step_kind_label"><property name="text"><string>Kind</string></property></widget></item>
+         <item row="0" column="1">
+          <widget class="QComboBox" name="step_kind">
+           <item><property name="text"><string>Sweep</string></property></item>
+           <item><property name="text"><string>Loop</string></property></item>
+           <item><property name="text"><string>Read</string></property></item>
+           <item><property name="text"><string>Wait</string></property></item>
+          </widget>
+         </item>
+         <item row="1" column="0"><widget class="QLabel" name="step_instrument_label"><property name="text"><string>Instrument</string></property></widget></item>
+         <item row="1" column="1"><widget class="QComboBox" name="step_instrument"/></item>
+         <item row="2" column="0"><widget class="QLabel" name="step_property_label"><property name="text"><string>Property</string></property></widget></item>
+         <item row="2" column="1"><widget class="QComboBox" name="step_property"/></item>
+         <item row="3" column="0"><widget class="QLabel" name="step_from_label"><property name="text"><string>From</string></property></widget></item>
+         <item row="3" column="1"><widget class="SIEdit" name="step_from"/></item>
+         <item row="4" column="0"><widget class="QLabel" name="step_to_label"><property name="text"><string>To</string></property></widget></item>
+         <item row="4" column="1"><widget class="SIEdit" name="step_to"/></item>
+         <item row="5" column="0"><widget class="QLabel" name="step_points_label"><property name="text"><string>Points</string></property></widget></item>
+         <item row="5" column="1">
+          <widget class="QSpinBox" name="step_points">
+           <property name="minimum"><number>1</number></property>
+           <property name="maximum"><number>1000000</number></property>
+           <property name="value"><number>101</number></property>
+          </widget>
+         </item>
+         <item row="6" column="0"><widget class="QLabel" name="step_spacing_label"><property name="text"><string>Spacing</string></property></widget></item>
+         <item row="6" column="1">
+          <widget class="QComboBox" name="step_spacing">
+           <item><property name="text"><string>linear</string></property></item>
+           <item><property name="text"><string>log</string></property></item>
+           <item><property name="text"><string>list</string></property></item>
+          </widget>
+         </item>
+         <item row="7" column="0"><widget class="QLabel" name="step_settle_label"><property name="text"><string>Settle</string></property></widget></item>
+         <item row="7" column="1">
+          <widget class="QDoubleSpinBox" name="step_settle">
+           <property name="decimals"><number>3</number></property>
+           <property name="maximum"><double>3600</double></property>
+           <property name="suffix"><string> s</string></property>
+          </widget>
+         </item>
+         <item row="8" column="0"><widget class="QLabel" name="step_rate_label"><property name="text"><string>Rate</string></property></widget></item>
+         <item row="8" column="1"><widget class="SIEdit" name="step_rate"><property name="toolTip"><string>At most the instrument's max rate from the config</string></property></widget></item>
+         <item row="9" column="1"><widget class="QCheckBox" name="step_snake"><property name="text"><string>Snake (reverse every other pass)</string></property></widget></item>
+         <item row="10" column="1"><widget class="QCheckBox" name="step_fly"><property name="text"><string>Fly (continuous ramp, read on the way)</string></property></widget></item>
+        </layout>
+       </widget>
+      </widget>
+      <widget class="QWidget" name="bottom">
+       <layout class="QVBoxLayout" name="bottom_lay" stretch="0,1">
+        <property name="leftMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <item>
+         <widget class="QGroupBox" name="run_box">
+          <property name="title"><string>Run</string></property>
+          <layout class="QHBoxLayout" name="run_lay">
+           <item><widget class="QLabel" name="sample_label"><property name="text"><string>Sample</string></property></widget></item>
+           <item><widget class="QLineEdit" name="sample"><property name="placeholderText"><string>sample name</string></property></widget></item>
+           <item><widget class="QLabel" name="out_label"><property name="text"><string>Save to</string></property></widget></item>
+           <item><widget class="QLineEdit" name="out_dir"><property name="placeholderText"><string>data folder</string></property></widget></item>
+           <item><widget class="QPushButton" name="btn_browse"><property name="text"><string>…</string></property><property name="maximumSize"><size><width>30</width><height>16777215</height></size></property></widget></item>
+           <item><widget class="QPushButton" name="btn_dry_run"><property name="text"><string>Dry run</string></property><property name="toolTip"><string>Check every point against the limits and estimate the time; moves nothing</string></property></widget></item>
+           <item><widget class="QPushButton" name="btn_run"><property name="text"><string>Run</string></property></widget></item>
+           <item><widget class="QPushButton" name="btn_pause"><property name="text"><string>Pause</string></property></widget></item>
+           <item><widget class="QPushButton" name="btn_abort"><property name="text"><string>Abort</string></property></widget></item>
+           <item><widget class="QProgressBar" name="progress"><property name="value"><number>0</number></property></widget></item>
+           <item><widget class="QLabel" name="eta"><property name="text"><string>—</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="PlotWidget" name="live_plot">
+          <property name="minimumSize"><size><width>0</width><height>180</height></size></property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry"><rect><x>0</x><y>0</y><width>1280</width><height>22</height></rect></property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title"><string>&amp;File</string></property>
+    <addaction name="actionNew"/>
+    <addaction name="actionOpenSequence"/>
+    <addaction name="actionSaveSequence"/>
+    <addaction name="actionSaveSequenceAs"/>
+    <addaction name="separator"/>
+    <addaction name="actionCloseWindow"/>
+   </widget>
+   <widget class="QMenu" name="menuRun">
+    <property name="title"><string>&amp;Run</string></property>
+    <addaction name="actionDryRun"/>
+    <addaction name="actionRun"/>
+    <addaction name="actionPause"/>
+    <addaction name="actionAbort"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuRun"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionNew"><property name="text"><string>&amp;New sequence</string></property></action>
+  <action name="actionOpenSequence"><property name="text"><string>&amp;Open sequence…</string></property></action>
+  <action name="actionSaveSequence"><property name="text"><string>&amp;Save sequence</string></property></action>
+  <action name="actionSaveSequenceAs"><property name="text"><string>Save sequence &amp;as…</string></property></action>
+  <action name="actionCloseWindow"><property name="text"><string>&amp;Close</string></property></action>
+  <action name="actionDryRun"><property name="text"><string>&amp;Dry run</string></property></action>
+  <action name="actionRun"><property name="text"><string>&amp;Run</string></property></action>
+  <action name="actionPause"><property name="text"><string>&amp;Pause</string></property></action>
+  <action name="actionAbort"><property name="text"><string>&amp;Abort</string></property></action>
+ </widget>
+ <customwidgets>
+  <customwidget><class>SIEdit</class><extends>QLineEdit</extends><header>gmcore.gui.common.panels</header></customwidget>
+  <customwidget><class>PlotWidget</class><extends>QGraphicsView</extends><header>pyqtgraph</header></customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

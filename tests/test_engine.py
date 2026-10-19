@@ -2,9 +2,9 @@ import asyncio
 
 import pytest
 
-from generalmeasurements.devices.sim import SimLockin, SimSource
-from generalmeasurements.engine import Bus, Controller, Event, RunStart, RunStop, run
-from generalmeasurements.plans import Axis, PlanError, Scan, linear
+from gmcore.devices.sim import SimLockin, SimSource
+from gmcore.engine import Bus, Controller, Event, RunStart, RunStop, run
+from gmcore.plans import Axis, PlanError, Scan, linear
 
 
 def test_snake_2d_path_is_continuous():

@@ -1,0 +1,27 @@
+[station]
+name = "bench"
+shutdown_order = ["gate", "bias"]
+
+[devices.gate]
+driver = "keithley_2450"
+resource = "GPIB0::18::INSTR"
+compliance = 1e-9
+limits = [-10.0, 10.0]
+
+[devices.bias]
+driver = "keithley_2400"
+resource = "GPIB0::24::INSTR"
+compliance = 1e-6
+limits = [-1.0, 1.0]
+
+[devices.dmm]
+driver = "keithley_2000"
+resource = "GPIB0::16::INSTR"
+nplc = 10
+
+[devices.lockin]
+driver = "sr830"
+resource = "GPIB0::8::INSTR"
+frequency = 17.77
+time_constant = 0.3
+sensitivity = 1e-3

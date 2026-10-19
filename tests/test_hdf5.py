@@ -4,12 +4,12 @@ import h5py
 import numpy as np
 import pytest
 
-from generalmeasurements.devices.sim import SimLockin, SimSource
-from generalmeasurements.engine import Bus, run
-from generalmeasurements import load
-from generalmeasurements.plans import Axis, Scan, linear
-from generalmeasurements.provenance import collect
-from generalmeasurements.sinks import HDF5Sink, resume_point
+from gmcore.devices.sim import SimLockin, SimSource
+from gmcore.engine import Bus, run
+from gmcore import load
+from gmcore.plans import Axis, Scan, linear
+from gmcore.provenance import collect
+from gmcore.sinks import HDF5Sink, resume_point
 
 
 def _station():
