@@ -71,13 +71,21 @@ async def test_noncritical_sink_failure_does_not_abort():
 async def test_drop_policy_never_drops_start_stop():
     bus = Bus()
     got = []
+    last_point = asyncio.Event()
 
-    async def slow(sub):
+    async def slow(sub):                       # stuck until every point is published:
+        async for item in sub:                 # its 2-item queue must overflow, however
+            got.append(item)                   # fast the machine is (RunStop is never
+            await last_point.wait()            # dropped, so it is only freed then)
+
+    async def watch(sub):
         async for item in sub:
-            got.append(item)
-            await asyncio.sleep(0.01)
+            if isinstance(item, Event) and item.seq == 39:
+                last_point.set()
     bus.add_sink("slow", slow, maxsize=2, policy="drop", critical=False)
-    await run(Scan((Axis("g", linear(0, 1, 40)),)), {"g": SimSource("g")}, bus)
+    bus.add_sink("watch", watch, critical=False)
+    await asyncio.wait_for(
+        run(Scan((Axis("g", linear(0, 1, 40)),)), {"g": SimSource("g")}, bus), 10)
     await bus.join()
     assert isinstance(got[0], RunStart) and isinstance(got[-1], RunStop)
     assert len([i for i in got if isinstance(i, Event)]) < 40

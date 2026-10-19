@@ -73,7 +73,8 @@ driver test bench `python -m gmcore.gui.legacy.bench`.
 
 The project is GeneralMeasurements; its Python package is `gmcore` (the core
 shared by the CLI and both GUIs), so `import gmcore`. The CLI is `gm` (long
-form `generalmeasurements`).
+form `generalmeasurements`). In Windows PowerShell `gm` is a built-in alias for
+`Get-Member`: type `gm.exe` or `generalmeasurements` there.
 
 Read the data back:
 
