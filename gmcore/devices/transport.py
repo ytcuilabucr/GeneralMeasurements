@@ -14,7 +14,10 @@ import re
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    from pyvisa.resources import MessageBasedResource
 
 
 class DriverError(RuntimeError):
@@ -41,18 +44,27 @@ class VisaTransport:
         self.write_termination = write_termination
         self.echo, self.echo_wait_ms = echo, echo_wait_ms
         self._last_write = ""
-        self._inst = None
+        self._inst: MessageBasedResource | None = None
         self._lock = asyncio.Lock()
 
     async def open(self) -> None:
-        def _open():
+        def _open() -> MessageBasedResource:
             import pyvisa  # lazy: simulators and tests don't need VISA installed
+            from pyvisa.resources import MessageBasedResource
             inst = pyvisa.ResourceManager().open_resource(self.resource)
+            if not isinstance(inst, MessageBasedResource):    # e.g. a register-based PXI/VXI one
+                inst.close()
+                raise DriverError(f"{self.resource}: not a message-based (text) resource")
             inst.timeout = self.timeout_ms
             inst.read_termination = self.read_termination
             inst.write_termination = self.write_termination
             return inst
         self._inst = await asyncio.to_thread(_open)
+
+    def _session(self) -> MessageBasedResource:
+        if self._inst is None:
+            raise DriverError(f"{self.resource}: not open")
+        return self._inst
 
     async def _call(self, fn, *args):
         """Run a blocking VISA call under the session lock. If the caller is
@@ -71,12 +83,13 @@ class VisaTransport:
         On a timeout, device-clear first: otherwise a reply that arrives late
         is read by the next query (seen on a Keithley 2000: '-KEITHLEY...')."""
         import pyvisa
+        from pyvisa import constants
         try:
             return fn(cmd)
         except pyvisa.errors.VisaIOError as e:
-            if e.error_code == pyvisa.constants.StatusCode.error_timeout:
+            if e.error_code == constants.StatusCode.error_timeout:
                 try:
-                    self._inst.clear()
+                    self._session().clear()
                 except pyvisa.errors.VisaIOError:
                     pass
                 raise TimeoutError(f"{self.resource}: {cmd!r} timed out") from e
@@ -86,24 +99,26 @@ class VisaTransport:
         """Blocking: write, then drop the echo if it comes (late echoes are
         skipped by the next query)."""
         import pyvisa
-        self._inst.write(cmd)
-        old = self._inst.timeout
-        self._inst.timeout = self.echo_wait_ms
+        inst = self._session()
+        inst.write(cmd)
+        old = inst.timeout
+        inst.timeout = self.echo_wait_ms
         try:
-            self._inst.read()
+            inst.read()
         except pyvisa.errors.VisaIOError:
             pass
         finally:
-            self._inst.timeout = old
+            inst.timeout = old
 
     def _query_echo(self, cmd: str) -> str:
         """Blocking: write, then read until a line that isn't an echoed command."""
-        self._inst.write(cmd)
-        line = self._inst.read()
+        inst = self._session()
+        inst.write(cmd)
+        line = inst.read()
         for _ in range(3):
             if line.strip() not in (cmd.strip(), self._last_write):
                 break
-            line = self._inst.read()
+            line = inst.read()
         return line
 
     async def write(self, cmd: str) -> None:
@@ -111,16 +126,16 @@ class VisaTransport:
             self._last_write = cmd.strip()
             await self._call(self._guarded, self._write_echo, cmd)
         else:
-            await self._call(self._guarded, self._inst.write, cmd)
+            await self._call(self._guarded, self._session().write, cmd)
 
     async def query(self, cmd: str) -> str:
-        fn = self._query_echo if self.echo else self._inst.query
+        fn = self._query_echo if self.echo else self._session().query
         return (await self._call(self._guarded, fn, cmd)).strip()
 
     async def close(self) -> None:
         if self._inst is not None:
-            await asyncio.to_thread(self._inst.close)
-            self._inst = None
+            inst, self._inst = self._inst, None
+            await asyncio.to_thread(inst.close)
 
 
 class FakeTransport:

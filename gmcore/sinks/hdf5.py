@@ -20,6 +20,22 @@ from ..engine.events import Event, Note, RunStart, RunStop
 SCHEMA_VERSION = 1
 
 
+def group(parent: h5py.Group, path: str) -> h5py.Group:
+    """parent[path], which must be a group (h5py's indexing isn't typed)."""
+    obj = parent[path]
+    if not isinstance(obj, h5py.Group):
+        raise ValueError(f"{parent.file.filename}: {path} is not a group")
+    return obj
+
+
+def dataset(parent: h5py.Group, path: str) -> h5py.Dataset:
+    """parent[path], which must be a dataset."""
+    obj = parent[path]
+    if not isinstance(obj, h5py.Dataset):
+        raise ValueError(f"{parent.file.filename}: {path} is not a dataset")
+    return obj
+
+
 def _plan_json(plan) -> str:
     return json.dumps(plan.to_dict(), sort_keys=True, default=str)
 
@@ -29,7 +45,7 @@ def resume_point(path: str | Path) -> int:
     with h5py.File(path, "r") as f:
         if f.attrs.get("mode") == "fly":
             raise ValueError("fly runs cannot be resumed")
-        return int((f["data/seq"][...] >= 0).sum())
+        return int((dataset(f, "data/seq")[...] >= 0).sum())
 
 
 class HDF5Sink:
@@ -121,19 +137,24 @@ class HDF5Sink:
         self._f = f
         f.flush()
 
+    def _file(self) -> h5py.File:
+        if self._f is None:
+            raise RuntimeError(f"{self.path}: no run open (an event before RunStart?)")
+        return self._f
+
     async def _event(self, ev: Event) -> None:
-        f = self._f
-        d = f["data"]
+        f = self._file()
+        d = group(f, "data")
         if f.attrs.get("mode") == "fly":
             self._fly_event(f, ev)
         else:
             for name, val in ev.data.items():
                 if name not in d:   # field without describe(): scalar, created lazily
-                    d.create_dataset(name, shape=f["data/seq"].shape, dtype="f8",
+                    d.create_dataset(name, shape=dataset(d, "seq").shape, dtype="f8",
                                      fillvalue=np.nan)
-                d[name][ev.index] = val
-            d["timestamp"][ev.index] = ev.timestamp
-            d["seq"][ev.index] = ev.seq    # written last: marks the point complete
+                dataset(d, name)[ev.index] = val
+            dataset(d, "timestamp")[ev.index] = ev.timestamp
+            dataset(d, "seq")[ev.index] = ev.seq    # written last: marks the point complete
         self._n += 1
         if self._n % self.flush_every == 0:
             await asyncio.to_thread(f.flush)
@@ -157,7 +178,7 @@ class HDF5Sink:
         d["ramp"][-1] = ev.index[0]
 
     def _stop(self, st: RunStop) -> None:
-        f = self._f
+        f = self._file()
         f.attrs["status"], f.attrs["reason"] = st.status, st.reason
         f.attrs["t_stop"] = time.time()
         if st.reason:

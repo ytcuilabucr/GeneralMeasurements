@@ -353,6 +353,12 @@ read-only queries to the Lake Shore 335, 625, Giga-tronics 2420B and SR850.
   up to date). `InstrumentRow` declares its table widgets. With the GUI
   packages installed, pyright went from 527 errors to 162; the rest are other
   kinds (None checks, untyped h5py/pyvisa returns, override signatures).
+- Typed h5py and VISA access, down to 111 pyright errors:
+  - `sinks/hdf5.py`'s `group()` / `dataset()` check what a path holds;
+    `dataset.py` uses them, so a malformed file says which path is wrong.
+  - The sink refuses an event before RunStart with a clear error.
+  - `VisaTransport` keeps a typed `MessageBasedResource` and raises
+    "not open" instead of an AttributeError on `None`.
 
 ### Known gaps
 - SR850 (GPIB 8) stopped answering everything but `OUTP?` (which reads 0)
