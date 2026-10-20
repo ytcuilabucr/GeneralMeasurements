@@ -16,7 +16,7 @@ python -m venv .venv
 .venv\Scripts\activate           # Linux: source .venv/bin/activate
 pip install -e ".[dev]"          # core + xarray + pytest
 pip install -e ".[plot]"         # optional: live plot (pyqtgraph + PySide6)
-pip install -e ".[gui]"          # optional: instrument windows (+ PySide6-QtAds)
+pip install -e ".[gui]"          # optional: windows (+ PySide6-QtAds, tomlkit, QtAwesome)
 pytest                           # ~7 s, no hardware needed
 ```
 
@@ -60,8 +60,11 @@ Instrument Server (needs the `gui` extra): `python instrumentserver.py` or
 instrument config with their names and drivers, connects them, and opens their
 panels; File opens and saves the config. Connecting never resets an
 instrument. See [docs/instrument-server.md](docs/instrument-server.md). The
-second main GUI, General Measurement (sequences), is planned; its window opens
-from the server's Window menu as a layout preview.
+second main GUI, **General Measurement**, builds and runs measurements on the
+server's connected instruments after Labber's Measurement Editor (a step
+sequence, the first channel the inner loop, and log channels); it opens from
+the server's Window menu. See
+[docs/general-measurement.md](docs/general-measurement.md).
 
 The window layouts are Qt Designer forms (`.ui`), loaded at runtime: see
 [docs/designer.md](docs/designer.md).
@@ -148,9 +151,11 @@ gmcore/
   devices/   protocols.py, transport.py, sim.py, definitions.py,
              keithley_2400.py, keithley_2401.py, keithley_2410.py, keithley_2450.py,
              keithley_2000.py, srs_lockin.py, lakeshore_335.py, lakeshore_625.py,
-             gigatronics_2420b.py, lm510.py
+             gigatronics_2420b.py, lm510.py, aotf_octal.py (+ aotf_server32.py),
+             ysl_aotf.py, ysl_sc_pro8.py
     defs/    one TOML definition per driver (one per mode where a mode changes units)
   plans/     axes.py, scan.py (stepped), fly.py (FlyScan)
+  measurement/  config.py, channels.py (General Measurement's measurements)
   engine/    runner.py, fly.py, bus.py, control.py, safety.py, retry.py, remote.py, events.py
   sinks/     hdf5.py, liveplot.py, notify.py
   config/    schema.py (pydantic), registry.py
@@ -160,7 +165,7 @@ gmcore/
                   worker.py, hub.py, registry.py, uiload.py,
                   dedicated_panels/ (temperature, magnet, helium panels)
     server/       Instrument Server: window.py
-    measurement/  General Measurement: window.py (layout preview)
+    measurement/  General Measurement: window.py
     legacy/       superseded: station.py (gm gui), views.py, bench.py
   api.py  cli.py  dataset.py  provenance.py  units.py
 Instrument config/   lab.toml, sim.toml, example.toml

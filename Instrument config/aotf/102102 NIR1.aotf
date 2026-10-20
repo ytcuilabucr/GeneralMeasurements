@@ -1,0 +1,72 @@
+[Channel 0]
+wavelength = 600.000000
+wavelength FSK = 600.000000
+power = 100.000000
+power FSK = ""
+enabled = FALSE
+nickname = "Channel 0"
+
+[Channel 1]
+wavelength = 670.000000
+wavelength FSK = 670.000000
+power = 100.000000
+power FSK = ""
+enabled = FALSE
+nickname = "Channel 1"
+
+[Channel 2]
+wavelength = 740.000000
+wavelength FSK = 740.000000
+power = 100.000000
+power FSK = ""
+enabled = FALSE
+nickname = "Channel 2"
+
+[Channel 3]
+wavelength = 810.000000
+wavelength FSK = 810.000000
+power = 100.000000
+power FSK = ""
+enabled = FALSE
+nickname = "Channel 3"
+
+[Channel 4]
+wavelength = 880.000000
+wavelength FSK = 880.000000
+power = 100.000000
+power FSK = ""
+enabled = FALSE
+nickname = "Channel 4"
+
+[Channel 5]
+wavelength = 950.000000
+wavelength FSK = 950.000000
+power = 100.000000
+power FSK = ""
+enabled = FALSE
+nickname = "Channel 5"
+
+[Channel 6]
+wavelength = 1020.000000
+wavelength FSK = 1020.000000
+power = 100.000000
+power FSK = ""
+enabled = FALSE
+nickname = "Channel 6"
+
+[Channel 7]
+wavelength = 1100.000000
+wavelength FSK = 1100.000000
+power = 100.000000
+power FSK = ""
+enabled = FALSE
+nickname = "Channel 7"
+
+[Calibration]
+tuning0=3.587E+02
+tuning1=-7.412E-01 
+tuning2=6.317E-04    
+tuning3=-1.936E-07  
+ 
+PowerNorm = Power Opt:370-600=5570,600-670=3000,670-740=3800,740-810=4900,810-880=4400,880-950=4800,950-1020=4800,1020-1100=4200,1100-2300=5600
+

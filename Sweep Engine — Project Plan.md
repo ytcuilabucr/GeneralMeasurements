@@ -186,7 +186,7 @@ The work is split between two main GUIs, run as two main windows of one program 
   - **Open panel** shows the instrument's dedicated panel if it has one (the cryostat instruments). Otherwise it shows the standard panel built from the driver definition, and failing that a generic panel.
   - A fixed File menu opens and saves the config (Open, Save, Save As).
   - **Add instrument** is planned.
-- **General Measurement** generates and modifies measurement sequences (plans) from the instruments the server has connected, and runs them through the runner on those same sessions. Not started.
+- **General Measurement** generates and modifies measurement sequences (plans) from the instruments the server has connected, and runs them through the runner on those same sessions. Skeleton built after Labber's Measurement Editor (`docs/general-measurement.md`): step sequence, step items, log channels, run with pause and stop, HDF5 data, live plot.
 
 Rules:
 
@@ -194,7 +194,7 @@ Rules:
 - **Names are working names.** The name in the server's table, by default the model and an index such as `Keithley 2400 - 1`, is what sequences and data keys use (`Keithley 2400 - 1.v`). A name can be changed only while the instrument is disconnected. It can't contain `.` or `/` (they separate data keys and HDF5 paths), and it must be unique.
 - **One program.** The two windows share the device objects, the async worker and the data hub directly, with no network link between them. The localhost control server stays for remote pause and abort.
 - **Predecessors.** The Instrument Server replaces the driver test bench and the per-type station windows (`gm gui`). Both are kept in `gui/legacy/` until the server covers them. The monitor and chart windows there may be reused by General Measurement.
-- **Focus.** The Instrument Server comes first. General Measurement follows on the same core and the same shared GUI parts (`gui/common/`); for now it is a layout preview, sketched in Qt Designer.
+- **Focus.** The Instrument Server comes first. General Measurement follows on the same core and the same shared GUI parts (`gui/common/`); its skeleton runs measurements, and the Labber features it lacks are listed in its doc.
 
 ## Development phases
 
@@ -290,3 +290,4 @@ The costliest failures are a damaged sample and silently wrong data, so most mit
 | 2026-10-18 | Window layouts are Qt Designer forms loaded at runtime (QUiLoader into the window object), not code or `pyside6-uic` output | Layouts can be edited without touching code; loading costs a few ms per window, about the same as building it in code; no build step to forget. Dynamic rows (instruments, definition properties) stay in code |
 | 2026-10-18 | `gui/` split into `common/`, `server/`, `measurement/`, `legacy/`; core packages unchanged; configs in `Instrument config/`, the tests' copies in `tests/fixtures/` | Focus on the Instrument Server first, with General Measurement on the same core later. Keeping the core in place keeps every import and plan file working. The tests no longer depend on configs that users edit and the server saves |
 | 2026-10-18 | Two main GUIs, Instrument Server (connections) and General Measurement (sequences), as two windows of one program. Instrument names in the config are working names used by sequences and data | One owner per session (the server) without inter-process plumbing. Names users choose are the names they see in data. Config files live in `Instrument config/` and keep the station schema, so `gm run --station` works on them too |
+| 2026-10-19 | General Measurement follows Labber's Measurement Editor: channels (instrument quantities) in a step sequence, first = inner loop, values from step items, plus log channels. Channels come from the driver definitions; a measurement is turned into an ordinary `Scan` through adapters (`gmcore/measurement/`), so the engine is unchanged. Unlike Labber, no stored instrument settings are written back at the start | Users know Labber's workflow. Definitions already say what is settable, its limits and units. Reusing the runner keeps its validation, abort, safe shutdown and HDF5 format. Writing a whole settings snapshot to the instruments is the riskiest Labber feature for a sample, so only the step channels are ever written |

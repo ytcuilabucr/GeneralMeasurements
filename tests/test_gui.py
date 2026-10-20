@@ -3,6 +3,7 @@
 import os
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -447,7 +448,7 @@ def test_definition_panel_output_asks_then_reads(app, window, monkeypatch):
     assert ":SOUR:VOLT:LEV 0.2" in t.log
 
 
-def test_definition_panel_switches_mode_with_station_settings(app, window, monkeypatch):
+def test_definition_panel_switch_mode_asks_for_the_new_settings(app, window, monkeypatch):
     from gmcore.config.schema import KeithleySMUModeCfg
     smu = _SMU("CURR")
     t = smu.transport()
@@ -457,17 +458,33 @@ def test_definition_panel_switches_mode_with_station_settings(app, window, monke
     p = w.panels["bias"]
     p.connect_dev()
     wait(app, lambda: p.ctrl_box.isEnabled() and "level" in p.rows)
-    p.switch_mode("volt")                               # the station has no volt settings
-    assert "add [devices.bias.modes.volt]" in w.log_view.toPlainText()
-    assert "*RST" not in t.log
-    p.cfg = p.cfg.model_copy(update={"modes": {"volt": KeithleySMUModeCfg(
-        compliance=1e-6, limits=(-1, 1))}})
+    asked = []
+
+    def answer(target, keys, start, units, message):  # stands in for the dialog
+        asked.append((target, start, units))
+        return {"compliance": 1e-6, "limits": (-1.0, 1.0)}
+    monkeypatch.setattr(p, "ask_switch_settings", answer)
+    assert p._switch_btn.isEnabled()                    # connected, output off
+    p.values["output"] = True                           # output on: no switching
+    p._update_enabled()
+    assert not p._switch_btn.isEnabled()
+    assert p._switch_btn.toolTip() == "Turn output off first"
     p.switch_mode("volt")
+    assert "turn Output off before switching" in w.log_view.toPlainText() and not asked
+    p.values["output"], p.values["level"] = False, 1e-6  # off; the level doesn't matter
+    p._update_enabled()
+    p._switch_btn.click()                               # the button; no table: defaults
+    assert asked[0] == ("volt", {"compliance": 1e-6, "limits": [-1.0, 1.0]},
+                        {"compliance": "A", "limits": "V"})
     wait(app, lambda: p.defn is not None and p.defn.mode == "volt" and "level" in p.rows)
     assert ":SOUR:FUNC VOLT" in t.log and p.cfg.mode == "volt"
     assert (p.rows["level"].unit, p.dev.limits) == ("V", (-1.0, 1.0))
     assert p._mismatch is None and all(c.isEnabled() for c in p.rows["level"].controls)
     assert w.hub.is_up("bias")
+    p.cfg = p.cfg.model_copy(update={"modes": {"curr": KeithleySMUModeCfg(
+        compliance=0.5, limits=(-1e-6, 1e-6))}})
+    p.switch_mode("curr")                               # the station's table pre-fills
+    assert asked[1][1] == {"compliance": 0.5, "limits": (-1e-6, 1e-6)}
 
 
 def test_definition_panel_dmm_function_and_lockin_tables(app, window, monkeypatch):
@@ -517,9 +534,9 @@ def test_definition_panel_folds_by_level(app, window, monkeypatch):
     assert not more.isAncestorOf(li.rows["sensitivity"].now)                   # level 0
     assert li.rows["sensitivity"].now.isVisibleTo(li)
     assert not li.rows["frequency"].now.isVisibleTo(li)                        # folded
-    wait(app, lambda: li._labels["lockin.r"][0].text() == "2 µV")   # still read while folded
-    assert not li._labels["lockin.r"][0].isVisibleTo(li)
-    assert li._labels["lockin.x"][0].isVisibleTo(li)
+    wait(app, lambda: li._labels["lockin.r"][0].text() == "2 µV")
+    for key in ("lockin.x", "lockin.y", "lockin.r", "lockin.theta"):   # all main readings
+        assert li.read_box.isAncestorOf(li._labels[key][0]), key
     win.set_detail(1)
     assert li.rows["frequency"].now.isVisibleTo(li) and not li.rows["idn"].now.isVisibleTo(li)
     win.detail_actions[2].trigger()
@@ -629,3 +646,67 @@ def test_update_settings_nplc_box_and_resizable_charts(app, window, monkeypatch)
     closed.set_open(True)
     assert closed.maximumHeight() > 10000
     p.timer.stop()
+
+
+def test_panel_shows_how_long_a_read_takes(app, window):
+    import asyncio
+    w = _sim_connected(app, window)
+    p = w.panels["gate"]
+    assert len(p.read_times) == 1 and p.read_time.text().startswith("read ")
+    dev, orig = p.dev, p.dev.read
+
+    async def slow():
+        await asyncio.sleep(0.18)
+        return await orig()
+    dev.read = slow
+    p.interval.setValue(1.0)
+    for _ in range(10):
+        _poll(app, p)
+    assert len(p.read_times) == 10 and p.read_time_s() >= 0.18   # the last ten only
+    assert "color" not in p.read_time.text()
+    p.interval.setValue(0.2)                            # reads take most of 0.2 s: amber
+    assert "#b9770e" in p.read_time.text() and "no faster" in p.read_time.toolTip()
+
+
+def test_aotf_panel_switches_calibration(app, window, monkeypatch, tmp_path):
+    from gmcore.devices import AotfOctal
+    from gmcore.devices.aotf_octal import read_calibration
+    vis, nir = (Path(f"Instrument config/aotf/102102 {m}.aotf").resolve().as_posix()
+                for m in ("Visible", "NIR1"))
+    station = tmp_path / "optics.toml"
+    station.write_text(f'''[station]
+name = "optics"
+shutdown_order = []
+
+[devices.AOTF]
+driver = "aotf_octal"
+resource = "AOTF::0"
+calibrations = {{ vis = "{vis}", nir = "{nir}" }}
+''')
+    f532 = read_calibration(vis).frequency(532.0) * 1e6
+    t = FakeTransport({"dds f 0": f"Channel 0 profile 0 frequency {f532:.6e}Hz",
+                       "dds a 0": "Channel 0 amplitude 624"})   # 10 % on
+    _fake(monkeypatch, lambda n: AotfOctal(n, t, {"vis": read_calibration(vis),
+                                                  "nir": read_calibration(nir)}))
+    w = window(str(station))
+    p = w.panels["AOTF"]
+    p.connect_dev()
+    wait(app, lambda: p.ctrl_box.isEnabled() and "wavelength" in p.rows)
+    assert p.values["wavelength"] == pytest.approx(532.0, abs=1e-3)
+    assert p.values["power"] == pytest.approx(10.0)
+    monkeypatch.setattr(p, "ask_switch_settings", lambda *a: pytest.fail("no dialog"))
+    monkeypatch.setattr(QtWidgets.QMessageBox, "question", lambda *a, **k: pytest.fail("no ask"))
+    p._update_enabled()
+    assert p._switch_btn.isEnabled()                    # light on: no interlock
+    n = len(t.log)
+    p._switch_btn.click()                               # one click, straight to NIR
+    wait(app, lambda: p.defn is not None and p.defn.mode == "nir" and "wavelength" in p.rows)
+    assert t.log[n:] == ["dds f 0", "dds a 0"]          # only the re-read: nothing written
+    assert p.cfg.mode == "nir" and p.dev.cal_name == "102102 NIR1.aotf"
+    # the same RF, read through the NIR curve; power relative to NIR1's band
+    nm = p.dev.wavelength_of(f532 / 1e6)
+    assert p.values["wavelength"] == pytest.approx(nm)
+    assert p.values["power"] == pytest.approx(100 * 624 / p.dev.cal.norm(nm))
+    p._switch_btn.click()                               # and back
+    wait(app, lambda: p.defn.mode == "vis" and "wavelength" in p.rows)
+    assert p.values["wavelength"] == pytest.approx(532.0, abs=1e-3)

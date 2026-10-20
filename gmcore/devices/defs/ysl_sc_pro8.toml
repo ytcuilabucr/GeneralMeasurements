@@ -1,0 +1,86 @@
+# YSL Photonics SC-PRO8 supercontinuum laser (serial). State and alarm are
+# queried; power and repetition rate cannot be: they read what the driver set
+# and are unknown (NaN) after connect.
+
+drivers = ["ysl_sc_pro8"]
+label = "YSL SC-PRO8 laser"
+info = "Power and repetition rate read what was set (the laser cannot report them)"
+safe = "Emission off (LA0)"
+groups = ["Laser", "Status"]
+
+[properties.emitting]
+level = 0
+kind = "status"
+key = "emission"
+label = "{name} emission on (0/1)"
+
+[properties.in_fault]
+level = 0
+kind = "status"
+key = "fault"
+label = "{name} fault (0/1)"
+severity = "red"
+
+[properties.pw]
+level = 0
+key = "power"
+label = "{name} power"
+unit = "%"
+
+[properties.rr]
+level = 1
+key = "rate"
+label = "{name} repetition rate"
+unit = "MHz"
+
+[properties.emission]
+level = 0
+kind = "bool"
+access = "both"
+group = "Laser"
+label = "Emission"
+get = "emission_on"
+set = "set_emission"
+confirm = """Turn the laser emission ON?
+
+Class 4 supercontinuum light: beam path closed or blocked, eyewear on."""
+confirm_when = [true]
+tooltip = "ON needs a power set in this session (the laser's present power cannot be read)."
+
+[properties.power]
+level = 0
+access = "both"
+group = "Laser"
+label = "Power"
+unit = "%"
+get = "power"
+set = "set_power"
+min = 0
+max = "max_power"
+readback = "pw"
+tooltip = "Pump level 0-100 % (sent as 0-600, steps of 1/6 %)"
+
+[properties.rate]
+level = 1
+kind = "enum"
+access = "both"
+group = "Laser"
+label = "Repetition rate"
+unit = "MHz"
+choices_attr = "rates"
+get = "rate_mhz"
+set = "set_rate"
+
+[properties.state]
+level = 1
+kind = "str"
+group = "Status"
+label = "State"
+get = "state"
+
+[properties.alarm]
+level = 1
+kind = "str"
+group = "Status"
+label = "Alarm (empty = none)"
+get = "alarm"

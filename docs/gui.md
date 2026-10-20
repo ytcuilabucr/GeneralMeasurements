@@ -108,7 +108,12 @@ python -m gmcore.gui.legacy.bench [--station "Instrument config/lab.toml"]
 
 **Connect** opens the session and reads the present state. It never resets an
 instrument or writes to it (checked on the lab bus with writes blocked).
-After connecting, **Live** polls `read()` every second (adjustable).
+After connecting, **Live** polls `read()` every second (adjustable, 0.02 s to
+60 s; the LM-510 10 s to 600 s). Next to the interval, `read 85 ms` is how long
+a poll takes: the average of the last ten, including every query the poll makes.
+It turns amber at 80 % of the interval or more. A poll never starts before the
+previous one has finished, so a shorter interval than that only means polls one
+after another.
 
 | Instrument | On connect (queries only) |
 | --- | --- |
@@ -168,17 +173,24 @@ What asks first, and what is disabled when, also comes from the definition.
 | Lake Shore 625 | Ramp to target at a rate (shows an ETA); Ramp to zero; Hold. Never touches the switch heater | every ramp |
 | LM-510 | Mode (Sample/Hold, Continuous); meter interval; Measure now | |
 | Giga-tronics 2420B | Frequency; power (capped at `max_power_dbm`); RF On / Off | RF On |
-| SR830 / SR850 | Sensitivity; time constant; Auto phase; reference shown read only | |
+| SR830 / SR850 | Readings X, Y, R and phase; sensitivity; time constant; reference frequency (internal reference only), amplitude and phase (bounds from `srs_lockin.toml`, each read back); Auto phase | |
 
-**Switch mode…** on a Keithley SMU sets the level to 0, turns the output
-OFF, and resets and configures the unit in the other function. It needs that
-function's compliance and limits in the station file:
+**Switch mode…** on a Keithley SMU is enabled whenever the instrument is
+connected and its output is OFF, whatever the level (turn the output off
+first; the button's tooltip says so). It asks for the new function's compliance and limits, pre-filled
+from the station file if it has them:
 
 ```toml
 [devices.bias.modes.volt]
 compliance = 1e-6
 limits = [-1.0, 1.0]
 ```
+
+and otherwise from conservative defaults in the mode's definition
+(`switch_defaults` in `keithley_<model>_volt.toml` / `_curr.toml`: 1 µA and
+±1 V into voltage, 1 V and ±1 µA into current). Then the unit is reset and
+configured in the other function, at level 0 with the output off; turn the
+output on again when ready.
 
 The switch lasts until the GUI closes; the station file is not changed. If
 the unit is found sourcing a different function than the station's, its

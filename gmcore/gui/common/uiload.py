@@ -24,6 +24,8 @@ from pathlib import Path
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtUiTools import QUiLoader
 
+from . import icons
+
 FORMS_DIR = Path(__file__).resolve().parents[1] / "forms"     # gmcore/gui/forms
 
 
@@ -105,4 +107,5 @@ def load_ui(name: str, base: QtWidgets.QWidget) -> QtWidgets.QWidget:
         f.close()
     if w is None:
         raise RuntimeError(f"{path.name}: {loader.errorString()}")
+    icons.apply(base)                    # Material Design icons, by object name
     return w

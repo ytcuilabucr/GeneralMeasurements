@@ -23,9 +23,10 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from ...config.registry import build_device
 from ...devices.definitions import (LEVELS, Definition, Prop, bounds, choices, definition_of,
-                                    field_key, get_value, label_of, number, props,
+                                    field_key, get_value, label_of, load, number, props,
                                     read_connect, run, text, write)
 from ...units import SI_UNITS, fmt, parse_si
+from . import icons
 from .uiload import load_ui
 from .widgets import Fold, Led
 
@@ -68,6 +69,7 @@ class TrendChart(QtCore.QObject):
         for k, label, unit in channels:
             self.combo.addItem(f"{label} ({unit})" if unit else label, (k, label, unit))
         self.zoom = QtWidgets.QPushButton("Auto zoom")
+        icons.set_icon(self.zoom, "zoom")
         self.zoom.setToolTip("Back to the default view: fit all the data, and follow it")
         row = QtWidgets.QHBoxLayout()
         row.addWidget(self.combo, stretch=1)
@@ -132,6 +134,8 @@ class Panel(QtWidgets.QWidget):
     form: QtWidgets.QFormLayout | None = None
     charts_split: QtWidgets.QSplitter | None = None   # in the form, if it has charts
     btn_update: QtWidgets.QPushButton | None = None   # in the form: Update settings
+    read_time: QtWidgets.QLabel | None = None         # in the form: how long a read takes
+    MIN_INTERVAL = 0.02                         # s; the read time is the real limit
 
     def __init__(self, name: str, cfg, station):
         super().__init__()
@@ -142,6 +146,7 @@ class Panel(QtWidgets.QWidget):
         self._last_error = ""
         self._move = None
         self._t0 = 0.0
+        self.read_times: deque[float] = deque(maxlen=10)   # s, the last polls
         self._labels: dict[str, tuple[QtWidgets.QLabel, str]] = {}
         self._names: dict[str, str] = {}        # field key -> label, for the chart choices
         self._history: dict[str, deque[tuple[float, float]]] = {}
@@ -154,9 +159,10 @@ class Panel(QtWidgets.QWidget):
         self.btn_connect.clicked.connect(self.connect_dev)
         self.btn_disconnect.clicked.connect(self.disconnect_dev)
         self.live.toggled.connect(self._live_toggled)
-        self.interval.setRange(0.2, self.MAX_INTERVAL)
+        self.interval.setRange(self.MIN_INTERVAL, self.MAX_INTERVAL)
         self.interval.setValue(self.DEFAULT_INTERVAL)
         self.interval.valueChanged.connect(lambda v: self.timer.setInterval(int(v * 1000)))
+        self.interval.valueChanged.connect(lambda _v: self._show_read_time())
         self.btn_read.clicked.connect(self.poll)
         self.btn_safe.setToolTip(self.safe_tip())
         self.btn_safe.clicked.connect(self.safe)
@@ -339,6 +345,8 @@ class Panel(QtWidgets.QWidget):
         self._set_enabled(True)
         self._t0 = time.monotonic()
         self._history.clear()
+        self.read_times.clear()
+        self._show_read_time()
         self.after_attach(result)
         self.build_charts()
         self.connected.emit(self.name)
@@ -367,7 +375,44 @@ class Panel(QtWidgets.QWidget):
         if self.dev is None or self._reading:
             return
         self._reading = True
-        self.call(self.read_coro(), "read", self._got, quiet=True)
+        self.call(self._timed_read(), "read", self._got_timed, quiet=True)
+
+    async def _timed_read(self) -> tuple[dict | None, float]:
+        """The poll and how long it took: every query it makes (e.g. "is the output
+        on?" before a Keithley read), including any wait for the session lock."""
+        t0 = time.perf_counter()
+        data = await self.read_coro()
+        return data, time.perf_counter() - t0
+
+    def _got_timed(self, result: tuple[dict | None, float]) -> None:
+        data, seconds = result
+        self.read_times.append(seconds)
+        self._show_read_time()
+        self._got(data)
+
+    def read_time_s(self) -> float | None:
+        """The average of the last reads (None before the first)."""
+        return sum(self.read_times) / len(self.read_times) if self.read_times else None
+
+    def _show_read_time(self) -> None:
+        """`read 85 ms` next to the interval; amber once reads take most of it (the
+        next poll waits for the read, so the interval can't be shorter)."""
+        if self.read_time is None:
+            return
+        avg = self.read_time_s()
+        if avg is None:
+            self.read_time.setText("")
+            return
+        shown = ("< 1 ms" if avg < 0.0005 else f"{avg * 1000:.0f} ms" if avg < 1
+                 else f"{avg:.2g} s")
+        slow = avg >= 0.8 * self.interval.value()
+        self.read_time.setText(f"<span style='color:#b9770e'>read {shown}</span>" if slow
+                               else f"read {shown}")
+        self.read_time.setToolTip(
+            f"A read takes {shown} (average of the last {len(self.read_times)}; "
+            f"slowest {max(self.read_times) * 1000:.0f} ms)."
+            + (" The interval is about as short as the reads: polls come no faster than "
+               "one read after another." if slow else ""))
 
     def _got(self, data: dict | None) -> None:
         self._reading = False
@@ -407,8 +452,10 @@ class GenericPanel(Panel):
         self.target = SIEdit()
         self.rate = SIEdit()
         go = QtWidgets.QPushButton("Go")
+        icons.set_icon(go, "set")
         go.clicked.connect(self._go)
         stop = QtWidgets.QPushButton("Stop")
+        icons.set_icon(stop, "stop")
         stop.clicked.connect(self.stop_move)
         row = QtWidgets.QHBoxLayout()
         for w in (self.target, QtWidgets.QLabel("rate /s"), self.rate, go, stop):
@@ -475,6 +522,7 @@ class DefinitionPanel(Panel):
         self.rows: dict[str, _Row] = {}
         self._leds: dict[str, tuple[Led, Prop]] = {}
         self._mismatch: str | None = None
+        self._switch_btn: QtWidgets.QPushButton | None = None
 
     # -- connect -------------------------------------------------------------------
     async def attach(self):
@@ -545,6 +593,7 @@ class DefinitionPanel(Panel):
         while form.rowCount():
             form.removeRow(0)
         self.rows.clear()
+        self._switch_btn = None
         self.info.setText(" — ".join(t for t in (f"<b>{text(defn.label, d)}</b>",
                                                    text(defn.info, d)) if t != "<b></b>" and t))
         if defn.modes:
@@ -552,8 +601,10 @@ class DefinitionPanel(Panel):
             row.addWidget(QtWidgets.QLabel(f"<b>{defn.modes.get(defn.mode or '', defn.mode)}</b>"))
             if defn.switch and len(defn.modes) > 1:
                 btn = QtWidgets.QPushButton("Switch mode…")
-                btn.clicked.connect(self.switch_mode)
+                icons.set_icon(btn, "switch")
+                btn.clicked.connect(lambda _checked=False: self.switch_mode())
                 row.addWidget(btn)
+                self._switch_btn = btn
             row.addStretch()
             form.addRow("Mode", row)
         self._fill_level(form, 0)
@@ -598,6 +649,7 @@ class DefinitionPanel(Panel):
             row = QtWidgets.QHBoxLayout()
             for pid, p in actions:
                 btn = QtWidgets.QPushButton(text(p.label, d) or pid)
+                icons.set_icon(btn, icons.ACTIONS.get(pid, "action"))
                 btn.setToolTip(text(p.tooltip, d))
                 btn.clicked.connect(lambda _=False, pid=pid: self.write_prop(pid))
                 row.addWidget(btn)
@@ -632,6 +684,7 @@ class DefinitionPanel(Panel):
             for on in (True, False):
                 asks = bool(p.confirm) and (not p.confirm_when or on in p.confirm_when)
                 btn = QtWidgets.QPushButton(("On" if on else "Off") + ("…" if asks else ""))
+                icons.set_icon(btn, "power_on" if on else "power_off")
                 btn.clicked.connect(lambda _=False, on=on: self.write_prop(pid, on))
                 r.controls.append(btn)
         elif p.writable and p.kind == "enum":
@@ -639,6 +692,7 @@ class DefinitionPanel(Panel):
             for label, v in choices(p, d):
                 combo.addItem(label or fmt(v, r.unit), v)
             btn = QtWidgets.QPushButton("Set")
+            icons.set_icon(btn, "set")
             btn.clicked.connect(lambda: self.write_prop(pid, combo.currentData()))
             r.edit = combo
             r.controls += [combo, btn]
@@ -654,12 +708,14 @@ class DefinitionPanel(Panel):
                 r.controls += [QtWidgets.QLabel("at"), r.rate,
                                QtWidgets.QLabel(text(p.ramp.unit, d))]
             btn = QtWidgets.QPushButton("Ramp to" if p.ramp else "Set")
+            icons.set_icon(btn, "ramp" if p.ramp else "set")
             btn.clicked.connect(lambda: self._write_from_edit(pid))
             r.controls.append(btn)
         for w in r.controls:
             lay.addWidget(w)
         if p.writable and (p.ramp or p.stoppable):     # Stop is never disabled
             stop = QtWidgets.QPushButton("Stop")
+            icons.set_icon(stop, "stop")
             stop.clicked.connect(lambda: self.stop_prop(pid))
             lay.addWidget(stop)
         lay.addStretch()
@@ -750,14 +806,34 @@ class DefinitionPanel(Panel):
         if r.edit is not None:
             r.edit.setProperty("filled", True)
 
+    def _interlock_ok(self, interlock: str | None) -> bool:
+        """A property that must be true ("x") or false / zero ("!x")."""
+        if not interlock:
+            return True
+        want = not interlock.startswith("!")
+        return bool(self.values.get(interlock.lstrip("!"))) == want
+
+    def _interlock_hint(self, interlock: str) -> str:
+        """What to do to meet an interlock: "turn Output off", "set Level to 0"."""
+        assert self.defn is not None
+        pid = interlock.lstrip("!")
+        p = self.defn.properties[pid]
+        label = text(p.label, self.dev) or pid
+        if p.kind == "bool":
+            return f"turn {label} {'off' if interlock.startswith('!') else 'on'}"
+        return f"set {label} to 0" if interlock.startswith("!") else f"set {label}"
+
     def _update_enabled(self):
         for r in self.rows.values():
-            ok = self._mismatch is None
-            if r.p.interlock:
-                want = not r.p.interlock.startswith("!")
-                ok = ok and bool(self.values.get(r.p.interlock.lstrip("!"))) == want
+            ok = self._mismatch is None and self._interlock_ok(r.p.interlock)
             for w in r.controls:
                 w.setEnabled(ok)
+        btn, defn = self._switch_btn, self.defn
+        if btn is not None and defn is not None:
+            ok = self._interlock_ok(defn.switch_interlock)
+            btn.setEnabled(ok)
+            btn.setToolTip("Switch to another mode" if ok else
+                           f"{self._interlock_hint(defn.switch_interlock).capitalize()} first")
 
     async def read_coro(self):
         defn = self.defn
@@ -857,17 +933,24 @@ class DefinitionPanel(Panel):
                 if not ok:
                     return
                 target = others[[defn.modes[m] for m in others].index(label)]
+        if not self._interlock_ok(defn.switch_interlock):
+            self.station.log("error", f"{self.name}: "
+                             f"{self._interlock_hint(defn.switch_interlock)} before switching mode")
+            return
+        message = self._template(defn.switch_confirm, mode=target,
+                                 mode_label=defn.modes[target]) if defn.switch_confirm else ""
         settings: dict[str, Any] = {}
         if defn.switch_settings:
+            new = load(type(self.dev).DEFINITION, target)
             saved = getattr(self.cfg, "modes", {}).get(target)
-            if saved is None:
-                self.station.log("error", f"{self.name}: no settings for {target}: add "
-                                 f"[devices.{self.name}.modes.{target}] with "
-                                 f"{', '.join(defn.switch_settings)} to the station file")
+            start = ({k: getattr(saved, k) for k in defn.switch_settings} if saved is not None
+                     else dict(new.switch_defaults))
+            units = {k: self._setting_unit(new, k) for k in defn.switch_settings}
+            got = self.ask_switch_settings(target, defn.switch_settings, start, units, message)
+            if got is None:
                 return
-            settings = {k: getattr(saved, k) for k in defn.switch_settings}
-        if defn.switch_confirm and not self.confirm(self._template(
-                defn.switch_confirm, mode=target, mode_label=defn.modes[target])):
+            settings = got
+        elif message and not self.confirm(message):
             return
 
         def done(_):
@@ -878,6 +961,57 @@ class DefinitionPanel(Panel):
             self.call(self.attach(), "read present state", self._reattached)
         self.call(run(self.dev, defn.switch, target, **settings),
                   f"switch to {defn.modes[target]}", done)
+
+    @staticmethod
+    def _setting_unit(new: Definition, key: str) -> str:
+        """A switch setting's unit in the new mode: the property of that name, or the
+        one whose limits it is (limits -> the level's unit)."""
+        if key in new.properties:
+            return new.properties[key].unit
+        return next((p.unit for p in new.properties.values() if p.limits == key), "")
+
+    def ask_switch_settings(self, target: str, keys: list[str], start: dict[str, Any],
+                            units: dict[str, str], message: str) -> dict[str, Any] | None:
+        """The new mode's settings, pre-filled; None when cancelled. A pair
+        (limits) gets two boxes. Values are checked by the driver."""
+        defn = self.defn
+        assert defn is not None
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle(f"{self.name}: switch to {defn.modes[target]}")
+        lay = QtWidgets.QVBoxLayout(dlg)
+        note = QtWidgets.QLabel(message)
+        note.setWordWrap(True)
+        lay.addWidget(note)
+        form = QtWidgets.QFormLayout()
+        boxes: dict[str, list[SIEdit]] = {}
+        for key in keys:
+            v, unit = start.get(key), text(units.get(key, ""), self.dev)
+            pair = isinstance(v, (list, tuple)) or key == "limits"
+            vals = list(v) if pair and v is not None else [v] if not pair else [None, None]
+            boxes[key] = [SIEdit(x, unit) for x in vals]
+            row = QtWidgets.QHBoxLayout()
+            for i, b in enumerate(boxes[key]):
+                if i:
+                    row.addWidget(QtWidgets.QLabel("…"))
+                row.addWidget(b)
+            row.addWidget(QtWidgets.QLabel(unit))
+            row.addStretch()
+            form.addRow(key.replace("_", " ").capitalize(), row)
+        lay.addLayout(form)
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok
+                                             | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        buttons.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).setText("Switch")
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        lay.addWidget(buttons)
+        if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            return None
+        try:
+            got = {k: [b.value() for b in bs] for k, bs in boxes.items()}
+        except ValueError as e:
+            self.station.log("error", f"{self.name}: switch mode: {e}")
+            return None
+        return {k: tuple(v) if len(v) > 1 else v[0] for k, v in got.items()}
 
     def _reattached(self, result):
         self.after_attach(result)
@@ -898,6 +1032,7 @@ def detail_actions(parent: QtWidgets.QWidget, bar: QtWidgets.QToolBar, panels: l
     group = QtGui.QActionGroup(parent)
     for level, label in LEVELS.items():
         act = QtGui.QAction(label, parent, checkable=True)
+        icons.set_icon(act, ("essential", "expanded", "all")[level])
         act.setToolTip(f"Show {label.lower()} properties on every panel here "
                        "(each panel's More / All folds still open on their own)")
         act.triggered.connect(lambda _=False, level=level: set_detail(level))

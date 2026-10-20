@@ -30,6 +30,7 @@ from ...config import load_station
 from ...config.registry import close_devices
 from ...config.schema import SimLockinCfg
 from ...engine.runner import safe_shutdown
+from ..common import icons, theme
 from ..common.hub import DataHub
 from ..common.panels import Panel, detail_actions
 from ..common.registry import panel_for
@@ -48,6 +49,12 @@ WINDOW_OF_DRIVER = {
     "sim_source": "Sources",
 }
 LAYOUT_VERSION = 1
+# toolbar text -> icon role (gui/common/icons.py)
+TOOL_ICONS = {"Connect": "connect", "Disconnect": "disconnect", "Safe state": "safe",
+              "Station": "station", "Connect all": "connect",
+              "Disconnect all": "disconnect", "All safe state": "safe",
+              "Show all windows": "open_panel", "New monitor…": "quick",
+              "New chart…": "sweep", "Reset layout": "reset"}
 _COLORS = {"info": "", "warn": "#b9770e", "error": "#c0392b"}
 _DOT = {"connected": "#1e8449", "error": "#c0392b", "connecting…": "#b9770e"}
 
@@ -72,6 +79,7 @@ class InstrumentWindow(QtWidgets.QMainWindow):
 
     def __init__(self, title: str, panels: list[Panel], station: StationWindow):
         super().__init__()
+        self.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.title, self.panels, self.station = title, panels, station
         self.setObjectName(f"window_{title}")
         self.setWindowTitle(f"{title} — {station.cfg.station.name}")
@@ -89,6 +97,7 @@ class InstrumentWindow(QtWidgets.QMainWindow):
                                               "this window"),
                 ("Station", station.show_raise, "Bring the station window to the front")):
             act = QtGui.QAction(text, self)
+            icons.set_icon(act, TOOL_ICONS[text])
             act.setToolTip(tip)
             act.triggered.connect(slot)
             bar.addAction(act)
@@ -185,6 +194,7 @@ class StationWindow(QtWidgets.QMainWindow):
     def __init__(self, station: str | Path, settings: QtCore.QSettings | None = None,
                  reset_layout: bool = False):
         super().__init__()
+        self.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.cfg = load_station(station)
         self.worker = AsyncWorker()
         self.hub = DataHub()
@@ -221,9 +231,11 @@ class StationWindow(QtWidgets.QMainWindow):
                 ("Reset layout", self.reset_layout, "Tab every instrument back into its "
                                                     "window and cascade the windows")):
             act = QtGui.QAction(text, self)
+            icons.set_icon(act, TOOL_ICONS[text])
             act.setToolTip(tip)
             act.triggered.connect(slot)
             bar.addAction(act)
+        theme.add_menu(self)
 
         # panels, grouped into windows in station order
         groups: dict[str, list[Panel]] = {}
@@ -248,6 +260,8 @@ class StationWindow(QtWidgets.QMainWindow):
         for row, (title, win) in enumerate(self.windows.items()):
             btn = QtWidgets.QPushButton(title)
             btn.setToolTip(f"Show the {title} window")
+            icons.set_icon(btn, icons.driver_role(win.panels[0].cfg.driver) if win.panels
+                           else "instrument")
             btn.clicked.connect(lambda _=False, w=win: self.show_window(w))
             grid.addWidget(btn, row, 0)
             names = QtWidgets.QHBoxLayout()

@@ -175,18 +175,18 @@ async def test_reading_the_settings_only_queries():
     assert t.log.count("SLVL?") == 3          # snapshot() once per lock-in, not per property
 
 
-async def test_keithley_switch_mode_zeroes_then_reconfigures():
+async def test_keithley_switch_mode_needs_output_off_then_reconfigures():
     t = Rec(lambda cmd: "0," if cmd == ":SYST:ERR?" else "0")
-    k = Keithley2400("gate", t, "volt", 1e-6, (-1, 1),
-                     settle_s=0)
-    k._output, k._level = True, 0.5
+    k = Keithley2400("gate", t, "volt", 1e-6, (-1, 1), settle_s=0)
+    k._output, k._level = True, 0.0
+    with pytest.raises(DriverError, match="output OFF"):
+        await k.switch_mode("curr", 21.0, (-1e-6, 1e-6))         # output on: refused
+    k._output, k._level = False, 0.5                              # off, level not 0: allowed
     with pytest.raises(ValueError, match="outside 2400 range"):
         await k.switch_mode("curr", 21.0, (-5.0, 5.0))           # 5 A: refused, no I/O
     assert t.writes == [] and k.mode == "volt"
     await k.switch_mode("curr", 21.0, (-1e-6, 1e-6))
-    off = t.writes.index(":OUTP OFF")
-    assert t.writes[off - 1] == ":SOUR:VOLT:LEV 0"                # level 0 first
-    assert t.writes[off + 1:off + 3] == ["*RST", "*CLS"]
+    assert t.writes[:3] == [":OUTP OFF", "*RST", "*CLS"]          # no level write
     assert ":SOUR:FUNC CURR" in t.writes and ":SENS:VOLT:PROT 21" in t.writes
     assert (k.mode, k.limits, k.compliance, k.output_on) == ("curr", (-1e-6, 1e-6), 21.0, False)
     assert defs.definition_of(k).properties["level"].unit == "A"

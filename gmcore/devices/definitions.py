@@ -117,6 +117,9 @@ class Definition(_Model):
     switch: str | None = None     # switch(mode, **settings): changes the mode on the instrument
     switch_confirm: str = ""
     switch_settings: list[str] = []   # station keys the new mode needs ([devices.X.modes.<mode>])
+    switch_defaults: dict[str, Any] = {}   # mode file: those settings' defaults for this mode
+    switch_interlock: str | None = None    # property that must be true ("x") / false ("!x")
+                                           # before Switch mode… (e.g. "!level": level at 0)
     read_if: str | None = None    # bool property: poll read() only while it is true
     safe: str = ""                # what safe_state() does, in words
     groups: list[str] = []        # display order of property groups
@@ -159,6 +162,10 @@ class Definition(_Model):
         if self.read_if and props[self.read_if].level != 0:
             raise ValueError(f"read_if {self.read_if!r} needs level 0: it says why "
                              "readings stop")
+        if self.switch_interlock and self.switch_interlock.lstrip("!") not in props:
+            raise ValueError(f"switch_interlock {self.switch_interlock!r} is not a property")
+        if bad := set(self.switch_defaults) - set(self.switch_settings):
+            raise ValueError(f"switch_defaults {sorted(bad)} not in switch_settings")
         return self
 
 

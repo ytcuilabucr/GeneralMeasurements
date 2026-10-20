@@ -1,0 +1,52 @@
+# YSL Photonics AOTF RF driver (serial): one line's wavelength and power. The
+# controller cannot be queried: the readings are what the driver set, not a
+# measurement of light, and they are unknown (NaN) until set after connect.
+
+drivers = ["ysl_aotf"]
+label = "YSL AOTF"
+info = "Usable {range_nm[0]:.0f}-{range_nm[1]:.0f} nm (20-200 MHz); control only (readings are the settings)"
+safe = "The vendor's turn-off command: no RF, no light"
+groups = ["Light"]
+
+[properties.wl]
+level = 0
+key = "wavelength"
+label = "{name} wavelength"
+unit = "nm"
+
+[properties.pw]
+level = 0
+key = "power"
+label = "{name} power"
+unit = "%"
+
+[properties.rf]
+level = 1
+key = "rf_frequency"
+label = "{name} RF frequency"
+unit = "MHz"
+
+[properties.wavelength]
+level = 0
+access = "both"
+group = "Light"
+label = "Wavelength"
+unit = "nm"
+get = "wavelength"
+set = "set"
+limits = "range_nm"                # the calibration's usable range, not a setting
+readback = "wl"
+tooltip = "Sets the RF frequency from the calibration cubic, with the present power (0 if none was set)"
+
+[properties.power]
+level = 0
+access = "both"
+group = "Light"
+label = "Power"
+unit = "%"
+get = "power"
+set = "set_power"
+min = 0
+max = "max_power"
+readback = "pw"
+tooltip = "The vendor's power level 0-100 (one line); 0 = no light. Needs a wavelength set first."

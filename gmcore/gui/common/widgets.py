@@ -15,6 +15,8 @@ import numpy as np
 import pyqtgraph as pg
 from PySide6 import QtCore, QtGui, QtWidgets
 
+from .icons import icon
+
 LED_COLORS = {"on": "#27ae60", "off": "#7f8c8d", "warn": "#f39c12", "bad": "#c0392b",
               "busy": "#3498db"}
 RANGES = {"All": None, "Last 30 min": 1800.0, "Last 2 h": 7200.0, "Last 24 h": 86400.0}
@@ -313,7 +315,7 @@ class DewarGauge(QtWidgets.QWidget):
                 p.setPen(QtGui.QPen(QtGui.QColor(color), 2, QtCore.Qt.PenStyle.DashLine))
                 p.drawLine(QtCore.QPointF(body.left() - 6, y), QtCore.QPointF(body.right() + 6, y))
                 p.drawText(QtCore.QPointF(body.right() - 34, y - 3), f"{tag}")
-        p.setPen(QtGui.QColor("#17202a"))
+        p.setPen(self.palette().color(QtGui.QPalette.ColorRole.WindowText))
         f = p.font()
         f.setPointSize(11)
         f.setBold(True)
@@ -374,7 +376,7 @@ class FieldBar(QtWidgets.QWidget):
             p.setBrush(QtGui.QColor("#e67e22"))
             p.setPen(QtCore.Qt.PenStyle.NoPen)
             p.drawPolygon(tri)
-        p.setPen(QtGui.QColor("#566573"))
+        p.setPen(self.palette().color(QtGui.QPalette.ColorRole.PlaceholderText))
         y = track.bottom() + 16
         p.drawText(QtCore.QPointF(track.left(), y), f"{self.lo:g} {self.unit}")
         r = f"{self.hi:g} {self.unit}"
@@ -402,6 +404,7 @@ class TimeChart(QtWidgets.QWidget):
         self.range.currentTextChanged.connect(lambda _: self._redraw())
         bar.addWidget(self.range)
         clear = QtWidgets.QPushButton("Clear")
+        clear.setIcon(icon("remove"))
         clear.clicked.connect(self.clear)
         bar.addWidget(clear)
         bar.addStretch()
@@ -506,7 +509,9 @@ class CsvLog(QtWidgets.QWidget):
         self.enabled = QtWidgets.QCheckBox("Log to CSV")
         self.folder = QtWidgets.QLineEdit(str(folder or Path.home() / "GeneralMeasurements"
                                               / "logs"))
-        browse = QtWidgets.QPushButton("…")
+        browse = QtWidgets.QPushButton()
+        browse.setIcon(icon("folder"))
+        browse.setToolTip("Choose the log folder")
         browse.setFixedWidth(30)
         browse.clicked.connect(self._browse)
         self.file_label = QtWidgets.QLabel("")

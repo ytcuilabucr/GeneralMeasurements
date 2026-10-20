@@ -27,21 +27,26 @@ from tomlkit.exceptions import TOMLKitError
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from ...config.schema import DRIVER_DEFAULTS, DRIVERS, StationConfig, check_name
+from ...engine.runner import safe_shutdown
 from ..common.panels import Panel, detail_actions
 from ..common.registry import panel_for
+from ..common import appsettings, icons, theme
+from ..common.appsettings import CONFIG_DIR
 from ..common.uiload import load_ui
 from ..common.widgets import Led, MenuPicker
 from ..common.worker import AsyncWorker
+from .quick import QuickView
 
-CONFIG_DIR = Path("Instrument config")
 FILE_FILTER = "Instrument config (*.toml);;All files (*)"
+LAST_KEY, OPEN_LAST_KEY = "instrument_server/last_config", "instrument_server/open_last"
 # driver -> model name for default instrument names ("Keithley 2400 - 1")
 MODEL_NAMES = {
     "keithley_2400": "Keithley 2400", "keithley_2401": "Keithley 2401",
     "keithley_2410": "Keithley 2410", "keithley_2450": "Keithley 2450",
     "keithley_2000": "Keithley 2000", "sr830": "SR830", "sr850": "SR850",
     "lakeshore_335": "Lake Shore 335", "lakeshore_625": "Lake Shore 625",
-    "gigatronics_2420b": "Giga-tronics 2420B", "lm510": "LM-510",
+    "gigatronics_2420b": "Giga-tronics 2420B", "lm510": "LM-510", "aotf_octal": "AOTF",
+    "ysl_aotf": "YSL AOTF", "ysl_sc_pro8": "SC-PRO8",
     "sim_source": "Sim source", "sim_magnet": "Sim magnet", "sim_lockin": "Sim lock-in",
 }
 _COLORS = {"info": "", "warn": "#b9770e", "error": "#c0392b"}
@@ -56,6 +61,8 @@ DRIVER_GROUPS = {
     "Lake Shore": ("lakeshore_335", "lakeshore_625"),
     "Stanford Research": ("sr830", "sr850"),
     "Giga-tronics": ("gigatronics_2420b",),
+    "Crystal Technology (Fianium)": ("aotf_octal",),
+    "YSL Photonics": ("ysl_sc_pro8", "ysl_aotf"),
     "Cryomagnetics": ("lm510",),
     "Simulated": ("sim_source", "sim_magnet", "sim_lockin"),
 }
@@ -123,6 +130,7 @@ class PanelWindow(QtWidgets.QMainWindow):
         load_ui("panel_window", self)
         self.panel = panel
         self.setWindowTitle(f"{panel.name} — {panel.cfg.driver} — {address}")
+        icons.set_window_icon(self, icons.driver_role(panel.cfg.driver))
         self.scroll_area.setWidget(panel)
         self.detail_actions: dict[int, QtGui.QAction] = {}
         if panel.FOLDS:
@@ -136,8 +144,14 @@ class InstrumentServer(QtWidgets.QMainWindow):
     """The table of instruments, the File menu and the log (server.ui). Panels use
     it as their station: `log`, `worker` and `devices`."""
 
-    def __init__(self, path: str | Path | None = None):
+    instruments_changed = QtCore.Signal()      # an instrument connected or disconnected
+
+    def __init__(self, path: str | Path | None = None,
+                 settings: appsettings.MiscSettings | QtCore.QSettings | None = None):
         super().__init__()
+        # remembered between sessions: the last config, the quick view's hidden
+        # readings (Instrument config/misc.toml, shared with the theme)
+        self.settings = settings if settings is not None else appsettings.misc()
         self.worker = AsyncWorker()
         self.devices: dict[str, object] = {}
         self.rows: list[InstrumentRow] = []
@@ -147,14 +161,32 @@ class InstrumentServer(QtWidgets.QMainWindow):
         self._dirty = False
         self._row_widgets: list[QtWidgets.QWidget] = []
         self.measurement: QtWidgets.QMainWindow | None = None
+        self._pending: list[InstrumentRow] = []    # Connect all: waiting for their source
 
         load_ui("server", self)
+        icons.set_window_icon(self, "app")
         self.actionOpen.triggered.connect(self.open_dialog)
         self.actionSave.triggered.connect(self.save)
         self.actionSaveAs.triggered.connect(self.save_as)
         self.actionExit.triggered.connect(self.close)
         self.actionGeneralMeasurement.triggered.connect(self.open_measurement)
         self.split.setSizes([420, 160])
+        self.quick = QuickView(self.quick_blocks, self.quick_empty, self.settings)
+        self.btn_quick_settings.clicked.connect(lambda: self.quick.edit(self))
+        self.btn_connect_all.clicked.connect(self.connect_all)
+        self.btn_safe_all.clicked.connect(self.safe_all)
+        self.btn_disconnect_all.clicked.connect(self.disconnect_all)
+        theme.add_menu(self)                 # only here: the panels follow it
+        self.menuMiscellaneous.addSeparator()
+        self.actionOpenLast = self.menuMiscellaneous.addAction(
+            "Open the last instrument config at start")
+        self.actionOpenLast.setObjectName("actionOpenLast")
+        self.actionOpenLast.setCheckable(True)
+        self.actionOpenLast.setChecked(open_last(self.settings))
+        self.actionOpenLast.toggled.connect(
+            lambda on: self.settings.setValue(OPEN_LAST_KEY, on))
+        if getattr(self.settings, "error", ""):
+            self.log("warn", self.settings.error)
 
         if path is not None:
             self.load(path)
@@ -187,6 +219,7 @@ class InstrumentServer(QtWidgets.QMainWindow):
         self._dirty = False
         self._build_table()
         self._update_title()
+        self.settings.setValue(LAST_KEY, appsettings.stored_path(path))
         self.log("info", f"opened {path} ({len(self.rows)} instruments)")
         return True
 
@@ -241,6 +274,7 @@ class InstrumentServer(QtWidgets.QMainWindow):
             r.saved_settings = dict(r.settings)
         self._dirty = False
         self._update_title()
+        self.settings.setValue(LAST_KEY, appsettings.stored_path(path))
         self.log("info", f"saved {path}")
         return True
 
@@ -290,6 +324,7 @@ class InstrumentServer(QtWidgets.QMainWindow):
         for i, r in enumerate(self.rows, start=1):
             self._add_row_widgets(i, r)
         self.grid.setRowStretch(len(self.rows) + 1, 1)
+        self._update_all_buttons()
 
     def _add_row_widgets(self, i: int, r: InstrumentRow) -> None:
         r.address = QtWidgets.QLabel(r.resource or "simulated")
@@ -305,10 +340,14 @@ class InstrumentServer(QtWidgets.QMainWindow):
         r.btn_connect = QtWidgets.QPushButton()
         r.btn_connect.setMinimumWidth(100)
         r.btn_connect.clicked.connect(lambda _=False, r=r: self.toggle_connection(r))
+        r.btn_safe = QtWidgets.QPushButton("Safe state")
+        icons.set_icon(r.btn_safe, "safe")
+        r.btn_safe.clicked.connect(lambda _=False, r=r: self.safe(r))
         r.btn_open = QtWidgets.QPushButton("Open panel")
+        icons.set_icon(r.btn_open, "open_panel")
         r.btn_open.clicked.connect(lambda _=False, r=r: self.open_panel(r))
         for col, w in enumerate((r.address, r.name_edit, r.driver_menu, r.led, r.btn_connect,
-                                 r.btn_open)):
+                                 r.btn_safe, r.btn_open)):
             self.grid.addWidget(w, i, col)
             self._row_widgets.append(w)
         self._update_row(r)
@@ -328,6 +367,7 @@ class InstrumentServer(QtWidgets.QMainWindow):
         r.led.setToolTip(r.panel.status.toolTip() if r.panel else "")
         on = r.connected
         r.btn_connect.setText("Disconnect" if busy else "Connect")
+        icons.set_icon(r.btn_connect, "disconnect" if busy else "connect", "white")
         r.btn_connect.setStyleSheet(f"background: {_RED if busy else _GREEN}; color: white; "
                                     "font-weight: bold; padding: 3px 10px;")
         r.btn_connect.setEnabled(on or (not busy and not problem))
@@ -335,10 +375,31 @@ class InstrumentServer(QtWidgets.QMainWindow):
                                              "present state" if busy else
                                              "Open the session and read the present state "
                                              "(no reset, no writes)"))
+        r.btn_safe.setEnabled(on)
+        r.btn_safe.setToolTip(r.panel.safe_tip() if on and r.panel else
+                              "Connect first")
         r.btn_open.setEnabled(not problem)
         r.name_edit.setEnabled(not busy)
         r.driver_menu.setEnabled(not busy)
         r.driver_menu.setToolTip(problem or f"The driver for this instrument ({r.driver})")
+        self._update_all_buttons()
+
+    def _can_connect(self, r: InstrumentRow) -> bool:
+        if r.busy:
+            return False
+        try:
+            r.cfg()
+        except ValidationError:
+            return False
+        return True
+
+    def _update_all_buttons(self) -> None:
+        if not hasattr(self, "btn_connect_all"):          # still loading the form
+            return
+        self.btn_connect_all.setEnabled(any(self._can_connect(r) for r in self.rows))
+        live = any(r.connected for r in self.rows)
+        self.btn_safe_all.setEnabled(live)
+        self.btn_disconnect_all.setEnabled(any(r.busy for r in self.rows) or bool(self._pending))
 
     def row(self, name: str) -> InstrumentRow:
         return next(r for r in self.rows if r.name == name)
@@ -392,11 +453,26 @@ class InstrumentServer(QtWidgets.QMainWindow):
         if r.panel is None:
             r.panel = panel_for(r.driver)(r.name, r.cfg(), self)
             r.panel.status_changed.connect(lambda _n, state, r=r: self._on_status(r, state))
+            r.panel.reading.connect(self.quick.update)
+            r.panel.connected.connect(lambda _n: self._refresh_quick())   # (re)attached
+            r.panel.connected.connect(lambda _n: self._connect_pending())
         return r.panel
 
     def _on_status(self, r: InstrumentRow, state: str) -> None:
         r.state = state
         self._update_row(r)
+        if state in ("connected", "disconnected"):
+            self._refresh_quick()
+            self.instruments_changed.emit()
+
+    def shutdown_order(self) -> list[str]:
+        """The config's [station] shutdown_order (names of the table's instruments)."""
+        return list(self.doc.unwrap().get("station", {}).get("shutdown_order", []))
+
+    def _refresh_quick(self) -> None:
+        """The quick view's blocks: every connected instrument's readings."""
+        self.quick.set_instruments({r.name: r.panel.dev.describe() for r in self.rows
+                                    if r.connected and r.panel is not None})
 
     def toggle_connection(self, r: InstrumentRow) -> None:
         if r.busy:
@@ -409,8 +485,79 @@ class InstrumentServer(QtWidgets.QMainWindow):
         self._panel(r).connect_dev()
 
     def disconnect(self, r: InstrumentRow) -> None:
+        if r in self._pending:
+            self._pending.remove(r)
         if r.panel is not None:
             r.panel.disconnect_dev()
+
+    def connect_all(self) -> None:
+        """Connect every row that isn't connected and has a valid config. A
+        simulated lock-in waits until the source it measures is up."""
+        for r in self.rows:
+            if not self._can_connect(r) or r in self._pending:
+                continue
+            if self._source_of(r):
+                self._pending.append(r)
+            else:
+                self.connect(r)
+        self._connect_pending()
+        self._update_all_buttons()
+
+    def _source_of(self, r: InstrumentRow) -> str:
+        """The instrument this row needs connected first ("" for none)."""
+        return r.settings.get("source", "") if r.driver == "sim_lockin" else ""
+
+    def _connect_pending(self) -> None:
+        for r in list(self._pending):
+            if self._source_of(r) in self.devices:
+                self._pending.remove(r)
+                self.connect(r)
+
+    def disconnect_all(self) -> None:
+        """Close every session; the instruments keep their present state."""
+        self._pending.clear()
+        for r in self.rows:
+            if r.busy:
+                self.disconnect(r)
+        self._update_all_buttons()
+
+    def safe(self, r: InstrumentRow) -> None:
+        """The row's safe state (the panel's Safe state), after asking."""
+        if not r.connected or r.panel is None:
+            return
+        if self._ask_safe([r.name], []):
+            r.panel.safe()
+
+    def safe_all(self) -> None:
+        """safe_state() on every connected instrument, in the config's shutdown order
+        first, after asking. One failure doesn't stop the others."""
+        live = [r for r in self.rows if r.connected and r.panel is not None]
+        if not live:
+            return
+        devs = {r.name: r.panel.dev for r in live}
+        order = [n for n in self.shutdown_order() if n in devs]
+        if not self._ask_safe(list(devs), order):
+            return
+        for r in live:
+            r.panel.stop_move()
+        self.log("warn", f"safe state: {', '.join(devs)}…")
+
+        def done(errors):
+            for e in errors:
+                self.log("error", f"safe state: {e}")
+            self.log("info", "safe state: done" + (" with errors" if errors else ""))
+            for r in live:
+                if r.connected:
+                    r.panel.poll()
+        self.worker.submit(safe_shutdown(devs, order), done,
+                           lambda e: self.log("error", f"safe state: {e}"))
+
+    def _ask_safe(self, names: list[str], order: list[str]) -> bool:
+        r = QtWidgets.QMessageBox.question(
+            self, "Safe state", f"Put {', '.join(names)} in the safe state "
+            "(safe_state())" + (f", in the order {', '.join(order)} first" if order else "")
+            + "?")
+        return r == QtWidgets.QMessageBox.StandardButton.Yes
 
     def open_panel(self, r: InstrumentRow) -> PanelWindow:
         if r.window is None:
@@ -423,7 +570,7 @@ class InstrumentServer(QtWidgets.QMainWindow):
         return r.window
 
     def open_measurement(self) -> QtWidgets.QMainWindow:
-        """The General Measurement window (a layout preview for now)."""
+        """The General Measurement window (one, kept while the server runs)."""
         from ..measurement import GeneralMeasurementWindow
         if self.measurement is None:
             self.measurement = GeneralMeasurementWindow(self)
@@ -447,6 +594,11 @@ class InstrumentServer(QtWidgets.QMainWindow):
 
     # -- closing -------------------------------------------------------------------------
     def closeEvent(self, event) -> None:
+        if self.measurement is not None and self.measurement.running:
+            QtWidgets.QMessageBox.information(self, "Close", "A measurement is running in "
+                                              "General Measurement: stop it first.")
+            event.ignore()
+            return
         live = [r for r in self.rows if r.connected]
         if live:
             box = QtWidgets.QMessageBox(self)
@@ -491,11 +643,23 @@ class InstrumentServer(QtWidgets.QMainWindow):
         event.accept()
 
 
+def open_last(settings) -> bool:
+    return settings.value(OPEN_LAST_KEY, True) in (True, "true")
+
+
+def start_config(settings=None) -> Path | None:
+    """The config to open at start: the last one used (misc.toml), unless that
+    option is off or the file is gone; then lab.toml, if there is one."""
+    settings = settings if settings is not None else appsettings.misc()
+    last = settings.value(LAST_KEY, "", str)
+    if open_last(settings) and last and Path(last).is_file():
+        return Path(last)
+    return CONFIG_DIR / "lab.toml" if (CONFIG_DIR / "lab.toml").exists() else None
+
+
 def main(path: str | Path | None = None) -> int:  # pragma: no cover
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
     app.setApplicationName("GeneralMeasurements")
-    if path is None and (CONFIG_DIR / "lab.toml").exists():
-        path = CONFIG_DIR / "lab.toml"
-    server = InstrumentServer(path)
+    server = InstrumentServer(path if path is not None else start_config())
     server.show()
     return app.exec()

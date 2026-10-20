@@ -31,6 +31,48 @@ read-only queries to the Lake Shore 335, 625, Giga-tronics 2420B and SR850.
 - Notifier sink (webhook) and live-plot sink (pyqtgraph window process).
 
 ### Added
+- **YSL Photonics** instruments, from the vendor's Python drivers, on a COM port
+  through VISA (`SerialBytesTransport`: raw bytes, reply ends when the port
+  goes quiet; `resource = "COM<n>"`). Not yet run on the hardware.
+  - **SC-PRO8 laser** (`ysl_sc_pro8`, `docs/adapters/ysl_sc_pro8.md`): emission
+    (confirmed; only after a power was set this session), power %, repetition
+    rate; state and alarm queried; safe state = emission off.
+  - **YSL AOTF** (`ysl_aotf`, `docs/adapters/ysl_aotf.md`): one line's
+    wavelength and power, binary CRC frames identical to the vendor's;
+    control only (no query at all); usable range 273-1424 nm from the vendor's
+    cubic; safe state = the vendor's turn-off.
+- **AOTF** (`aotf_octal`): the Fianium supercontinuum's Crystal Technology octal
+  AOTF controller, one channel's wavelength (nm) and power (%), from the
+  vendor's command reference and the lab's LabVIEW program
+  (`docs/adapters/aotf_octal.md`).
+  - USB through the vendor's 32-bit `AotfLibrary.dll`, run in msl-loadlib's
+    32-bit server (`aotf_server32.py`, `AotfLibraryTransport`; extra `aotf`).
+  - Wavelength → RF frequency from the calibration file's cubic; power as % of
+    its PowerNorm for the band, never above it; calibration files in
+    `Instrument config/aotf/`.
+  - Mode = calibration: VIS (`102102 Visible.aotf`) or NIR (`102102 NIR1.aotf`),
+    `calibrations = { vis, nir }`. Switch mode… swaps them in one click, with no
+    interlock; nothing is sent. No wavelength limits in the config: each file's
+    usable range (power bands, 1-200 MHz) is worked out from the file.
+  - Control only: readings are the settings (software level), read back from
+    the controller on connect; safe state = amplitude 0. Not yet run on the
+    hardware.
+- **General Measurement**, after Labber's Measurement Editor
+  (`docs/general-measurement.md`):
+  - the server's connected instruments with their Set channels (writable
+    numeric definition properties, or a plain `set()`) and Read channels
+    (`describe()` fields);
+  - a step sequence (the first channel is the inner loop, single values are set
+    once), each channel's values from step items (single, start – stop or
+    center – span; points or step size; linear or log), wait after set and
+    snake; log channels;
+  - Check (limits and estimated time, from the panels' read times), Start
+    (asks first), Pause / Resume, Stop; after the run hold or safe state;
+  - data as HDF5 filed by date (`Data/YYYY/MM/Data_MMDD/<name>.h5`), with the
+    measurement in the file; a live plot; measurements saved as TOML.
+  - `gmcore/measurement/` (config, channels, adapters to the ordinary runner;
+    no Qt). The server emits `instruments_changed` and has `shutdown_order()`,
+    and won't close while a measurement runs.
 - Adapters: Lake Shore 335 temperature controller and Lake Shore 625 magnet
   supply (Rampable), Giga-tronics 2420B signal generator (Movable on
   frequency or power). Read-only `configure()` checks for the Lake Shores;
@@ -130,6 +172,52 @@ read-only queries to the Lake Shore 335, 625, Giga-tronics 2420B and SR850.
   - The loader refuses object names that would replace a method.
   - `Panel.build_layout()` is replaced by `setup_ui()`, and `Panel.UI` names
     the form.
+- Icons: Material Design Icons (MDI 6) through QtAwesome, in every window.
+  - `gui/common/icons.py` maps roles to icons; Designer forms get theirs by
+    object name when they load.
+  - Toolbars keep their text beside the icons, and the panel windows get an
+    instrument icon.
+  - QtAwesome is added to the `gui` extra. Without it the GUI has no icons.
+- Theme: a **Miscellaneous** menu with **Follow system**, **Bright** and
+  **Dark** (`gui/common/theme.py`), in the Instrument Server (and the legacy
+  station and bench windows); the panel windows follow it.
+  - One setting for the whole application: changing it in any window changes
+    them all, and it is remembered.
+  - Windows use the Fusion style, because the native Windows 10 style has no
+    dark colours. Icons take the text colour and are redrawn on a change.
+- Panels show how long a read takes next to the Live interval (`read 85 ms`,
+  the average of the last ten polls), in amber once it is 80 % of the interval
+  or more. Timed around the panel's poll, so no driver changed.
+- Instrument Server table: a **Safe state** button per row (greyed out while
+  disconnected), and **Connect all**, **Set all safe** (shutdown order first,
+  after asking) and **Disconnect all** at the right of Add instrument.
+- The shortest Live interval is 0.02 s (was 0.2 s), `Panel.MIN_INTERVAL`.
+- App settings file `Instrument config/misc.toml` (`gui/common/appsettings.py`,
+  git-ignored): the theme, the last instrument config, whether to open it at
+  start, and the Quick view's hidden readings. Readable TOML, written on each
+  change.
+  - The Instrument Server starts with the last config opened or saved
+    (Miscellaneous → **Open the last instrument config at start**), else
+    `lab.toml`.
+- Instrument Server tabs: **Config** (the table and the log, as before) and
+  **Quick view** (`gui/server/quick.py`).
+  - The quick view stacks one block of readings per connected instrument,
+    fed by the panels' polls, so it adds no instrument traffic.
+  - **Settings…** gives a checkbox per reading to hide some. The hidden
+    readings are kept in `Instrument config/misc.toml`.
+- Keithley SMUs, **Switch mode…**: enabled whenever the instrument is
+  connected and the output is OFF, whatever the level. Otherwise the driver
+  refuses too.
+  - It asks for the new function's compliance and limits, pre-filled from the
+    station's `[devices.X.modes.<mode>]` or else from the mode file's
+    `switch_defaults`. No station table is required any more.
+  - Then `*RST` and configured in the new function (level 0, output off).
+  - Fixed: clicking the button raised `KeyError: False`.
+  - Definition keys `switch_interlock`, `switch_defaults`.
+- Lock-ins: R and phase are main readings (level 0), like X and Y.
+  - The reference frequency (internal reference only, harmonic × frequency ≤
+    102 kHz), amplitude and phase can be set. Their bounds come from
+    `srs_lockin.toml` (the driver uses the same values), and each is read back.
 - Keithley SMUs: **no Python-level ramp**. `set()` writes the level in one
   step everywhere: the panel's Set, scan points, `safe_state()` (level 0, then
   output off), output Off and `switch_mode()`.

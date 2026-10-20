@@ -4,6 +4,9 @@
 mode = "volt"
 info = "Sources voltage. Compliance {compliance:g} A; limits {limits[0]:g} … {limits[1]:g} V."
 
+# when switching into this mode, unless the station gives them
+switch_defaults = { compliance = 1e-6, limits = [-1.0, 1.0] }   # A; V
+
 [properties.level]
 level = 0
 access = "both"

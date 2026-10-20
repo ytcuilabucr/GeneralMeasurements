@@ -1,0 +1,61 @@
+# Crystal Technology octal AOTF controller (Fianium): one channel's wavelength
+# and power. The controller only generates RF: the readings are what the driver
+# set (read back from the controller on connect), not a measurement of light.
+
+#
+# The mode is the calibration: the visible or the NIR crystal, on the same
+# controller (the LabVIEW program's "tuning curve" selector). Switching uses
+# the other calibration file, in software only: no interlock, nothing is sent.
+
+drivers = ["aotf_octal"]
+label = "AOTF channel {channel}"
+info = "Calibration {cal_name} ({range_nm[0]:.0f}-{range_nm[1]:.0f} nm); control only (readings are the settings)"
+mode_attr = "mode"
+modes = { vis = "Visible (VIS)", nir = "Near infrared (NIR)" }
+attach = "sync"                    # on connect: dds f / dds a queries, nothing written
+switch = "switch_mode"             # one click, no confirmation: nothing is sent
+safe = "RF amplitude of this channel to 0 (no light); the frequency is kept"
+groups = ["Light"]
+
+[properties.wl]
+level = 0
+key = "wavelength"
+label = "{name} wavelength"
+unit = "nm"
+
+[properties.pw]
+level = 0
+key = "power"
+label = "{name} power"
+unit = "%"
+
+[properties.rf]
+level = 1
+key = "rf_frequency"
+label = "{name} RF frequency"
+unit = "MHz"
+
+[properties.wavelength]
+level = 0
+access = "both"
+group = "Light"
+label = "Wavelength"
+unit = "nm"
+get = "wavelength"
+set = "set"
+limits = "range_nm"                # the calibration's usable range, from the file
+readback = "wl"
+tooltip = "Sets the RF frequency from the calibration's tuning curve; with power on, the amplitude follows the new band's PowerNorm"
+
+[properties.power]
+level = 0
+access = "both"
+group = "Light"
+label = "Power"
+unit = "%"
+get = "power"
+set = "set_power"
+min = 0
+max = "max_power"
+readback = "pw"
+tooltip = "Percent of the calibration's optimum amplitude (PowerNorm) for the present wavelength; 0 = no light"

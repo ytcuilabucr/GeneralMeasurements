@@ -16,12 +16,12 @@ label = "{name} Y"
 unit = "V"
 
 [properties.r]
-level = 1
+level = 0
 label = "{name} R"
 unit = "V"
 
 [properties.theta]
-level = 1
+level = 0
 label = "{name} phase"
 unit = "deg"
 
@@ -49,24 +49,39 @@ set = "set_time_constant"
 
 [properties.frequency]
 level = 1
+access = "both"
 group = "Reference"
 label = "Frequency"
 unit = "Hz"
 get = "snapshot.frequency"
+set = "set_frequency"
+min = 0.001                        # FREQ 0.001 … 102 000 Hz (manuals); internal reference only
+max = 102000.0
+tooltip = "Internal reference frequency. Refused while the lock-in follows an external reference; harmonic * frequency must stay ≤ 102 kHz"
 
 [properties.amplitude]
 level = 1
+access = "both"
 group = "Reference"
 label = "Amplitude"
 unit = "V"
 get = "snapshot.amplitude"
+set = "set_amplitude"
+min = 0.004                        # SLVL 0.004 … 5.000 V rms (manuals)
+max = 5.0
+tooltip = "Sine output amplitude (V rms): the excitation of the sample"
 
 [properties.phase]
-level = 2
+level = 1
+access = "both"
 group = "Reference"
-label = "Phase"
+label = "Reference phase"
 unit = "deg"
 get = "snapshot.phase"
+set = "set_phase"
+min = -360.0                       # PHAS -360 … 729.99 (manuals); the unit wraps to ±180
+max = 729.99
+tooltip = "Phase shift of the reference; the lock-in shows it wrapped to ±180°"
 
 [properties.idn]
 level = 2

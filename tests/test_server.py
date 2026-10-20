@@ -17,6 +17,7 @@ from gmcore.config.schema import check_name  # noqa: E402
 from gmcore.config.registry import DRIVER_CLASSES  # noqa: E402
 from gmcore.devices import FakeTransport  # noqa: E402
 from gmcore.gui.common import panels  # noqa: E402
+from gmcore.gui.common.appsettings import MiscSettings  # noqa: E402
 from gmcore.gui.common.dedicated_panels import CRYO_PANELS  # noqa: E402
 from gmcore.gui.server import InstrumentServer, default_name  # noqa: E402
 
@@ -35,8 +36,8 @@ def server(app, tmp_path):
     shutil.copy(LAB, tmp_path / "lab.toml")
     servers = []
 
-    def make(path=tmp_path / "lab.toml"):
-        s = InstrumentServer(path)
+    def make(path=tmp_path / "lab.toml", misc="misc.toml"):
+        s = InstrumentServer(path, MiscSettings(tmp_path / misc))
         servers.append(s)
         return s
     yield make
@@ -184,3 +185,102 @@ def test_driver_menu_is_grouped_by_maker(server):
     assert r.driver_menu.action_for("keithley_2400").isChecked()
     r.driver_menu.action_for("keithley_2410").trigger()
     assert r.driver == "keithley_2410" and r.driver_menu.text() == "Keithley 2410"
+
+
+def test_config_and_quick_view_tabs(server, app, monkeypatch):
+    _fake_smu(monkeypatch)
+    s = server()
+    assert [s.tabs.tabText(i) for i in range(s.tabs.count())] == ["Config", "Quick view"]
+    assert s.config_tab.isAncestorOf(s.grid.parentWidget()) and s.config_tab.isAncestorOf(s.log_view)
+    assert not s.quick_empty.isHidden() and not s.quick.blocks        # nothing connected
+    r = s.row("Keithley 2400 - 1")
+    r.btn_connect.click()
+    wait(app, lambda: "Keithley 2400 - 1" in s.quick.blocks)
+    box = s.quick.blocks["Keithley 2400 - 1"]
+    assert s.quick_tab.isAncestorOf(box) and s.quick_empty.isHidden()
+    assert list(s.quick.values) == ["Keithley 2400 - 1.v", "Keithley 2400 - 1.i",
+                                    "Keithley 2400 - 1.compliance"]
+    r.panel.reading.emit(r.name, 0.0, {"Keithley 2400 - 1.v": 0.25,     # a poll
+                                       "Keithley 2400 - 1.compliance": 1.0})
+    assert s.quick.values["Keithley 2400 - 1.v"].text() == "250 mV"
+    assert s.quick.values["Keithley 2400 - 1.compliance"].text() == "yes"
+    # Settings…: untick a reading to hide it; it stays hidden across servers
+    dlg = s.quick.dialog(s)
+    assert set(dlg.items) == set(s.quick.values)
+    dlg.set_shown("Keithley 2400 - 1.i", False)
+    s.quick.set_hidden(dlg.hidden())
+    assert "Keithley 2400 - 1.i" not in s.quick.values
+    assert s.quick.values["Keithley 2400 - 1.v"].text() == "250 mV"     # kept its value
+    assert server().quick.hidden == {"Keithley 2400 - 1.i"}            # same misc file
+    r.btn_connect.click()                                               # disconnect
+    wait(app, lambda: not s.quick.blocks)
+    assert not s.quick_empty.isHidden()
+
+
+def test_misc_file_remembers_the_last_config_and_the_start_option(server, tmp_path,
+                                                                 monkeypatch):
+    import tomlkit
+
+    from gmcore.gui.server import window as server_window
+    monkeypatch.chdir(tmp_path)
+    s = server()                                         # opens tmp_path/lab.toml
+    misc = tmp_path / "misc.toml"
+    doc = tomlkit.parse(misc.read_text("utf-8"))
+    assert doc["instrument_server"]["last_config"] == "lab.toml"     # relative, readable
+    assert misc.read_text("utf-8").startswith("# GeneralMeasurements")
+    other = tmp_path / "other.toml"
+    s._write(other)                                      # Save as: the new file is the last
+    settings = MiscSettings(misc)                        # read back from disk
+    assert server_window.start_config(settings) == other.relative_to(tmp_path)
+    assert s.actionOpenLast.isChecked()
+    s.actionOpenLast.setChecked(False)                   # option off: lab.toml instead
+    settings = MiscSettings(misc)
+    assert settings.value("instrument_server/open_last") is False
+    monkeypatch.setattr(server_window, "CONFIG_DIR", tmp_path)
+    assert server_window.start_config(settings) == tmp_path / "lab.toml"
+    s.actionOpenLast.setChecked(True)
+    other.unlink()                                       # last one gone: lab.toml
+    assert server_window.start_config(MiscSettings(misc)) == tmp_path / "lab.toml"
+
+
+def test_a_broken_misc_file_means_defaults_and_a_warning(server, tmp_path):
+    (tmp_path / "bad.toml").write_text("theme = [", "utf-8")
+    s = server(misc="bad.toml")
+    assert s.settings.value("appearance/theme", "system") == "system"
+    assert "using defaults" in s.log_view.toPlainText()
+
+
+def test_all_buttons_and_row_safe_state(server, app, tmp_path, monkeypatch):
+    shutil.copy("tests/fixtures/sim.toml", tmp_path / "sim.toml")
+    s = server(tmp_path / "sim.toml")
+    asked = []
+
+    def yes(_parent, _title, text, *a, **k):
+        asked.append(text)
+        return QtWidgets.QMessageBox.StandardButton.Yes
+    monkeypatch.setattr(QtWidgets.QMessageBox, "question", yes)
+    gate = s.row("gate")
+    assert s.btn_connect_all.isEnabled() and not s.btn_safe_all.isEnabled()
+    assert not s.btn_disconnect_all.isEnabled()
+    assert not gate.btn_safe.isEnabled() and gate.btn_safe.toolTip() == "Connect first"
+
+    s.connect_all()                                      # the lock-in waits for "gate"
+    wait(app, lambda: all(r.state == "connected" for r in s.rows))
+    assert not s.btn_connect_all.isEnabled() and s.btn_safe_all.isEnabled()
+    assert all(r.btn_safe.isEnabled() for r in s.rows)
+
+    s.devices["magnet"].safe = False
+    gate.btn_safe.click()                                # one row, after asking
+    wait(app, lambda: s.devices["gate"].safe)
+    assert asked[-1] == "Put gate in the safe state (safe_state())?"
+    assert not s.devices["magnet"].safe
+
+    s.btn_safe_all.click()                               # all, shutdown order first
+    wait(app, lambda: "safe state: done" in s.log_view.toPlainText())
+    assert "in the order gate, bias, magnet first" in asked[-1]
+    assert s.devices["magnet"].safe and s.devices["bias"].safe
+
+    s.btn_disconnect_all.click()
+    wait(app, lambda: all(r.state == "disconnected" for r in s.rows))
+    assert not s.devices and not gate.btn_safe.isEnabled()
+    assert s.btn_connect_all.isEnabled() and not s.btn_disconnect_all.isEnabled()

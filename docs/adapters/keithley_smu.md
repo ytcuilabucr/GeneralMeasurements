@@ -153,11 +153,15 @@ Each model's definition is split per function: `defs/keithley_<model>.toml`
 the ranges in their units, and say which reading confirms the level.
 `switch_mode(mode, compliance, limits)`:
 
-1. checks the new settings against the model, before any I/O;
-2. sets the level to 0 (one step) and turns the output OFF;
-3. runs `configure()` (`*RST`) in the new function, with both ranges on auto.
+1. refuses unless the output is OFF (the level may be anything);
+2. checks the new settings against the model, before any I/O;
+3. runs `configure()` (`*RST`) in the new function, with both ranges on auto,
+   so it starts at level 0 with the output off.
 
-The GUI takes the settings from `[devices.X.modes.<mode>]` in the station.
+The GUI enables **Switch mode…** only with the output OFF
+(`switch_interlock = "!output"`). It asks for the settings, pre-filled from
+`[devices.X.modes.<mode>]` in the station or else from the mode file's
+`switch_defaults`.
 Not yet run on hardware.
 
 ## Tests

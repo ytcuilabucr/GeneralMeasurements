@@ -114,6 +114,11 @@ btn_read, btn_safe, charts_split (the code adds the folded charts).</comment>
           </widget>
          </item>
          <item>
+          <widget class="QLabel" name="read_time">
+           <property name="toolTip"><string>How long a read takes (the average of the last ten)</string></property>
+          </widget>
+         </item>
+         <item>
           <widget class="QPushButton" name="btn_read">
            <property name="text"><string>Read now</string></property>
           </widget>

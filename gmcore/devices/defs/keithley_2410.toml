@@ -15,9 +15,11 @@ check_mode = "active_mode"         # the unit's present source function
 switch = "switch_mode"
 switch_confirm = """Switch {name} to {mode_label}?
 
-The level goes to 0 (one step) and the output turns OFF. Then the unit is \
-reset (*RST) and configured with the station's {mode} settings."""
-switch_settings = ["compliance", "limits"]
+The unit is reset (*RST) and configured as a \
+{mode_label} with the settings below."""
+switch_settings = ["compliance", "limits"]   # asked for, pre-filled from the station's
+                                             # [devices.X.modes.<mode>] or switch_defaults
+switch_interlock = "!output"       # only with the output OFF
 read_if = "output"                 # with the output off the unit never replies to :READ?
 safe = "Level 0 (one step), then output OFF"
 groups = ["Source", "Measure"]

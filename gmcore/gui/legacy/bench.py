@@ -33,6 +33,7 @@ from pydantic import TypeAdapter
 from ...config import load_station
 from ...config.schema import DeviceCfg, StationConfig
 from PySide6 import QtCore, QtGui, QtWidgets
+from ..common import icons, theme
 from ..common.panels import Panel, detail_actions
 from ..common.registry import PANELS
 from ..common.worker import AsyncWorker
@@ -138,6 +139,7 @@ class DeviceWindow(QtWidgets.QMainWindow):
 
     def __init__(self, panel: Panel, bench: Bench, source: str):
         super().__init__()
+        self.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.panel, self.bench = panel, bench
         self.resource = panel.cfg.resource
         self.setWindowTitle(f"{panel.name} — {LABELS[panel.cfg.driver]} — {self.resource}")
@@ -187,6 +189,7 @@ class Bench(QtWidgets.QMainWindow):
 
     def __init__(self, station: str | Path | None = None, scan=scan_gpib):
         super().__init__()
+        self.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.worker = AsyncWorker()
         self.devices: dict[str, object] = {}
         self.windows: dict[str, DeviceWindow] = {}     # by resource
@@ -200,9 +203,11 @@ class Bench(QtWidgets.QMainWindow):
 
         bar = self.addToolBar("Bench")
         self.act_scan = QtGui.QAction("Rescan GPIB", self)
+        icons.set_icon(self.act_scan, "read")
         self.act_scan.setToolTip("Ask *IDN? at every GPIB address (queries only)")
         self.act_scan.triggered.connect(self.rescan)
         bar.addAction(self.act_scan)
+        theme.add_menu(self)
 
         self.table = QtWidgets.QWidget()
         self.grid = QtWidgets.QGridLayout(self.table)
@@ -273,6 +278,7 @@ class Bench(QtWidgets.QMainWindow):
         idn_label.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
         src_label = QtWidgets.QLabel()
         btn = QtWidgets.QPushButton("Open")
+        icons.set_icon(btn, "open_panel")
         row = {"driver": driver, "combo": combo, "idn": idn_label, "src": src_label,
                "open": btn}
         combo.currentTextChanged.connect(lambda _t, row=row: self._refresh(row))

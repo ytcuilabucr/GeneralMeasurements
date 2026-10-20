@@ -7,7 +7,8 @@ dependencies = ["numpy", "h5py", "pydantic>=2", "pyvisa", "pyvisa-py"]
 [project.optional-dependencies]
 xarray = ["xarray"]
 plot = ["pyqtgraph", "PySide6-Essentials"]
-gui = ["GeneralMeasurements[plot]", "PySide6-QtAds", "tomlkit"]
+gui = ["GeneralMeasurements[plot]", "PySide6-QtAds", "tomlkit", "QtAwesome"]
+aotf = ["msl-loadlib"]                # the AOTF's 32-bit AotfLibrary.dll from 64-bit Python
 dev = ["xarray", "pytest", "pytest-asyncio", "ruff", "pyright"]
 
 [project.scripts]

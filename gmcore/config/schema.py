@@ -8,6 +8,8 @@ from typing import Annotated, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ..devices.transport import serial_resource
+
 
 class _Dev(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -90,6 +92,55 @@ class LM510Cfg(_Dev):
     echo: bool = True                # the meter echoes commands on RS-232
 
 
+class AotfCfg(_Dev):
+    """Crystal Technology octal AOTF controller (Fianium), one RF channel, over
+    USB through the vendor's 32-bit AotfLibrary.dll (msl-loadlib).
+    resource = "AOTF::<n>": the controller's USB instance, 0 for the first.
+    mode picks the calibration: the visible or the NIR crystal. There are no
+    wavelength limits: each calibration's usable range comes from the file."""
+    driver: Literal["aotf_octal"]
+    channel: int = Field(0, ge=0, le=7)
+    mode: Literal["vis", "nir"] = "vis"
+    # .aotf files ([Calibration] tuning0-3 and PowerNorm), one per mode
+    calibrations: dict[Literal["vis", "nir"], str]
+    max_power: float = 100.0         # % of the calibration's optimum amplitude
+    settle_s: float = 0.0
+    dll: str = r"C:\Program Files (x86)\Fianium\config files\AotfLibrary.dll"
+
+    @field_validator("resource")
+    @classmethod
+    def _aotf_resource(cls, v: str) -> str:
+        if not v.upper().startswith("AOTF::") or not v[6:].isdigit():
+            raise ValueError('resource must be "AOTF::<instance>", e.g. "AOTF::0"')
+        return v
+
+
+class _SerialDev(_Dev):
+    """A serial instrument: resource "COM<n>" or "ASRL<n>::INSTR" (stored as the latter)."""
+
+    @field_validator("resource")
+    @classmethod
+    def _serial_resource(cls, v: str) -> str:
+        return serial_resource(v)
+
+
+class YslAotfCfg(_SerialDev):
+    """YSL Photonics AOTF RF driver, one line. No wavelength limits: the usable
+    range is where the calibration cubic stays in 20-200 MHz."""
+    driver: Literal["ysl_aotf"]
+    # f [MHz] = a·λ³ + b·λ² + c·λ + d, λ in nm (the vendor's Aotf_control.py)
+    calibration: dict[Literal["a", "b", "c", "d"], float] = {
+        "a": -2.09537e-7, "b": 6.67185e-4, "c": -0.76660, "d": 363.79358}
+    max_power: float = 100.0         # % cap
+    settle_s: float = 0.0
+
+
+class YslScPro8Cfg(_SerialDev):
+    """YSL Photonics SC-PRO8 supercontinuum laser."""
+    driver: Literal["ysl_sc_pro8"]
+    max_power: float = 100.0         # % cap
+
+
 class _Sim(BaseModel):
     """Simulated devices: no resource, for dry runs and offline development."""
     model_config = ConfigDict(extra="forbid")
@@ -116,10 +167,10 @@ class SimLockinCfg(_Sim):
 
 
 _CFGS = (KeithleySMUCfg, K2000Cfg, LockinCfg, LS335Cfg, LS625Cfg, GT2420BCfg, LM510Cfg,
-         SimSourceCfg, SimMagnetCfg, SimLockinCfg)
+         AotfCfg, YslAotfCfg, YslScPro8Cfg, SimSourceCfg, SimMagnetCfg, SimLockinCfg)
 DeviceCfg = Annotated[
     KeithleySMUCfg | K2000Cfg | LockinCfg | LS335Cfg | LS625Cfg | GT2420BCfg | LM510Cfg
-    | SimSourceCfg | SimMagnetCfg | SimLockinCfg,
+    | AotfCfg | YslAotfCfg | YslScPro8Cfg | SimSourceCfg | SimMagnetCfg | SimLockinCfg,
     Field(discriminator="driver")]
 # driver name -> its config class
 DRIVERS: dict[str, type[BaseModel]] = {
@@ -131,6 +182,12 @@ DRIVER_DEFAULTS: dict[str, dict] = {
     "lakeshore_335": {"limits": (2.0, 300.0), "max_rate": 1 / 60},
     "lakeshore_625": {"limits": (-1.0, 1.0), "max_rate": 0.01},
     "gigatronics_2420b": {"limits": (1e9, 2e10), "power_dbm": -20.0, "max_power_dbm": 0.0},
+    "aotf_octal": {"mode": "vis",
+                   "calibrations": {"vis": "Instrument config/aotf/102102 Visible.aotf",
+                                    "nir": "Instrument config/aotf/102102 NIR1.aotf"},
+                   "max_power": 10.0},
+    "ysl_aotf": {"max_power": 10.0},
+    "ysl_sc_pro8": {"max_power": 20.0},
     "sim_lockin": {"source": ""},
 }
 

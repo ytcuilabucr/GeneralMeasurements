@@ -6,13 +6,17 @@ full scale, OFLT 0 … 19 = 10 µs … 30 ks (the same tables for both); SLVL
 0.004 … 5.000 V rms; FREQ 0.001 … 102 000 Hz (internal reference only); time
 constants above 30 s are refused when the detection frequency exceeds 200 Hz,
 and short ones are raised to the minimum the filter slope and reserve allow.
+
+The reference frequency, amplitude and phase can be set; their bounds are the
+min / max of those properties in defs/srs_lockin.toml, and every setting is
+read back, so a value the lock-in refused or adjusted is reported.
 """
 
 from __future__ import annotations
 
 import math
 
-from .definitions import describe
+from .definitions import describe, prop_bounds
 from .protocols import FieldInfo
 from .transport import DriverError, Transport
 
@@ -35,11 +39,10 @@ class _SRSLockin:
     def __init__(self, name: str, transport: Transport, frequency: float | None = None,
                  amplitude: float = 0.1, time_constant: float = 0.1,
                  sensitivity: float = 1e-3):
-        if not 0.004 <= amplitude <= 5.0:
-            raise ValueError(f"amplitude {amplitude} V outside 0.004 … 5 V rms")
-        if frequency is not None and not 0.001 <= frequency <= 102e3:
-            raise ValueError(f"frequency {frequency} Hz outside 0.001 … 102000 Hz")
         self.name, self.t = name, transport
+        self._check("amplitude", amplitude, ValueError)
+        if frequency is not None:
+            self._check("frequency", frequency, ValueError)
         self.frequency, self.amplitude = frequency, amplitude
         self.time_constant, self.sensitivity = time_constant, sensitivity
 
@@ -82,6 +85,49 @@ class _SRSLockin:
                               f"{self.time_constant:g} s (above 200 Hz the limit is 30 s; "
                               "short ones are limited by the filter slope and reserve)")
         return self.time_constant
+
+    def _check(self, pid: str, value: float, error: type[Exception]) -> float:
+        """Within the definition's min / max for that property."""
+        lo, hi = prop_bounds(self, pid)
+        if (lo is not None and value < lo) or (hi is not None and value > hi):
+            raise error(f"{self.name}: {pid} {value:g} outside {lo:g} … {hi:g}")
+        return float(value)
+
+    async def set_frequency(self, hz: float) -> float:
+        """Internal reference frequency; refused while following an external
+        reference, and when harmonic * frequency would exceed 102 kHz."""
+        hz = self._check("frequency", hz, DriverError)
+        if (await self.t.query("FMOD?")).strip() == "0":
+            raise DriverError(f"{self.name}: the reference is external; the frequency "
+                              "follows the reference input")
+        harm = int(float(await self.t.query("HARM?")))
+        if harm * hz > 102e3:
+            raise DriverError(f"{self.name}: harmonic {harm} * {hz:g} Hz is above 102 kHz")
+        await self.t.write(f"FREQ {hz:.6g}")
+        got = float(await self.t.query("FREQ?"))   # rounded to 5 digits or 0.1 mHz
+        if abs(got - hz) > max(1e-4, 1e-4 * hz):
+            raise DriverError(f"{self.name}: asked for {hz:g} Hz, the lock-in has {got:g} Hz")
+        self.frequency = got
+        return got
+
+    async def set_amplitude(self, volts: float) -> float:
+        """Sine output amplitude (V rms)."""
+        volts = self._check("amplitude", volts, DriverError)
+        await self.t.write(f"SLVL {volts:.4g}")
+        got = float(await self.t.query("SLVL?"))   # 2 mV resolution
+        if abs(got - volts) > 0.0021:
+            raise DriverError(f"{self.name}: asked for {volts:g} V, the lock-in has {got:g} V")
+        self.amplitude = got
+        return got
+
+    async def set_phase(self, degrees: float) -> float:
+        """Reference phase shift; the lock-in wraps it to ±180°."""
+        degrees = self._check("phase", degrees, DriverError)
+        await self.t.write(f"PHAS {degrees:.2f}")
+        got = float(await self.t.query("PHAS?"))
+        if abs((got - degrees + 180) % 360 - 180) > 0.011:     # same angle, wrapped
+            raise DriverError(f"{self.name}: asked for {degrees:g}°, the lock-in has {got:g}°")
+        return got
 
     async def get_sensitivity(self) -> float:
         """Full-scale sensitivity now set on the unit (V)."""

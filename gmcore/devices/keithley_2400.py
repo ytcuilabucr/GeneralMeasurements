@@ -177,13 +177,18 @@ class Keithley2400:
 
     async def switch_mode(self, mode: str, compliance: float,
                           limits: tuple[float, float]) -> None:
-        """Change the source function: level 0 and output OFF in the old mode,
-        then configure() (*RST) in the new one. Settings are checked first."""
+        """Change the source function, with the output OFF (else refused; the
+        level may be anything): *RST and configure() in the new one, so the new
+        function starts at level 0 with the output off. The new settings are
+        checked against the model first, before any I/O."""
+        if self._output:
+            raise DriverError(f"{self.name}: turn the output OFF before switching the "
+                              "source function")
         old = (self.mode, self.compliance, self.limits)
         self._set_mode(mode, compliance, limits)               # raises before any I/O
         new = (self.mode, self.compliance, self.limits)
         self._set_mode(*old)
-        await self.safe_state()
+        await self.output(False)
         self._set_mode(*new)
         self._level = 0.0
         self.cfg_source_range = self.cfg_sense_range = None    # the station's were per mode

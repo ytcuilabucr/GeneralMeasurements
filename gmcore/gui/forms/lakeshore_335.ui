@@ -204,6 +204,7 @@ QProgressBar::chunk { background: #d35400; }</string>
     <layout class="QHBoxLayout" name="foot">
      <item><widget class="QCheckBox" name="live"><property name="text"><string>Live</string></property><property name="checked"><bool>true</bool></property></widget></item>
      <item><widget class="QDoubleSpinBox" name="interval"><property name="suffix"><string> s</string></property></widget></item>
+     <item><widget class="QLabel" name="read_time"><property name="toolTip"><string>How long a read takes (the average of the last ten)</string></property></widget></item>
      <item><widget class="QPushButton" name="btn_read"><property name="text"><string>Read now</string></property></widget></item>
      <item><spacer name="foot_stretch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
      <item><widget class="QPushButton" name="btn_safe"><property name="text"><string>Safe state</string></property></widget></item>

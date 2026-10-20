@@ -30,3 +30,27 @@ resource = "GPIB0::8::INSTR"
 frequency = 17.77
 time_constant = 0.3
 sensitivity = 1e-3
+
+# The Fianium AOTF (Crystal Technology octal controller, USB): one channel's
+# wavelength and power. Needs msl-loadlib (pip install msl-loadlib). See
+# docs/adapters/aotf_octal.md.
+[devices.AOTF]
+driver = "aotf_octal"
+resource = "AOTF::0"
+channel = 0
+mode = "vis"                       # which calibration: "vis" or "nir" (Switch mode… in the panel)
+calibrations = { vis = "Instrument config/aotf/102102 Visible.aotf", nir = "Instrument config/aotf/102102 NIR1.aotf" }
+max_power = 10.0
+
+# YSL Photonics SC-PRO8 laser and YSL AOTF, each on a COM port (9600 8N1). The
+# port numbers are placeholders. See docs/adapters/ysl_sc_pro8.md, ysl_aotf.md.
+[devices.SC]
+driver = "ysl_sc_pro8"
+resource = "COM7"
+max_power = 20.0                   # % cap
+
+[devices.YAOTF]
+driver = "ysl_aotf"
+resource = "COM8"
+max_power = 10.0
+# calibration = { a = -2.09537e-7, b = 6.67185e-4, c = -0.76660, d = 363.79358 }   # the vendor's (default)

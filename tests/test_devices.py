@@ -291,3 +291,36 @@ def test_validate_catches_what_the_model_cant_do(tmp_path, capsys):
                    "utf-8")
     assert cli.main(["validate", str(bad)]) == 1
     assert "2401 range" in capsys.readouterr().err
+
+
+async def test_lockin_reference_settings_are_set_and_read_back():
+    state = {"FREQ": "1000", "SLVL": "0.1", "PHAS": "0", "FMOD": "1", "HARM": "1"}
+
+    class Unit(FakeTransport):                      # a lock-in that keeps what it is sent
+        async def write(self, cmd):
+            await super().write(cmd)
+            k, _, v = cmd.partition(" ")
+            if k == "PHAS":                          # the unit wraps the phase to ±180
+                v = f"{(float(v) + 180) % 360 - 180:.2f}"
+            state[k] = v
+    t = Unit(lambda c: state.get(c.rstrip("?"), "0"))
+    li = SR830("li", t)
+    assert await li.set_frequency(1234.5) == 1234.5 and "FREQ 1234.5" in t.log
+    assert await li.set_amplitude(0.5) == 0.5
+    assert await li.set_phase(541.0) == -179.0        # the manual's example, wrapped
+    with pytest.raises(DriverError, match=re.escape("outside 0.004")):
+        await li.set_amplitude(6.0)                    # the .toml's max: nothing sent
+    assert not any(c.startswith("SLVL 6") for c in t.log)
+    state["HARM"] = "100"
+    with pytest.raises(DriverError, match="above 102 kHz"):
+        await li.set_frequency(2000.0)
+    state["FMOD"] = "0"                               # external reference
+    with pytest.raises(DriverError, match="external"):
+        await li.set_frequency(10.0)
+    state["SLVL"] = "0.2"                             # the unit kept another value
+
+    async def ignore(cmd):
+        t.log.append(cmd)
+    t.write = ignore
+    with pytest.raises(DriverError, match=re.escape("the lock-in has 0.2 V")):
+        await li.set_amplitude(1.0)

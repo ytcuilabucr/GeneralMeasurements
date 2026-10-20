@@ -2,20 +2,24 @@
 
 from __future__ import annotations
 
-from ..devices import (LM510, SR830, SR850, Gigatronics2420B, Keithley2000, Keithley2400,
-                       Keithley2401, Keithley2410, Keithley2450, LakeShore335, LakeShore625,
-                       VisaTransport)
+from ..devices import (LM510, SR830, SR850, AotfLibraryTransport, AotfOctal,
+                       Gigatronics2420B, Keithley2000, Keithley2400, Keithley2401,
+                       Keithley2410, Keithley2450, LakeShore335, LakeShore625,
+                       SerialBytesTransport, VisaTransport, YslAotf, YslScPro8)
+from ..devices.aotf_octal import read_calibration
 from ..devices.sim import SimLockin, SimMagnet, SimSource
-from .schema import (DeviceCfg, GT2420BCfg, K2000Cfg, KeithleySMUCfg, LM510Cfg, LockinCfg,
+from .schema import (AotfCfg, DeviceCfg, GT2420BCfg, K2000Cfg, KeithleySMUCfg, LM510Cfg, LockinCfg,
                      LS335Cfg, LS625Cfg, SimLockinCfg, SimMagnetCfg, SimSourceCfg,
-                     StationConfig)
+                     StationConfig, YslAotfCfg, YslScPro8Cfg)
 
 DRIVER_CLASSES: dict[str, type] = {
     "keithley_2400": Keithley2400, "keithley_2401": Keithley2401,
     "keithley_2410": Keithley2410, "keithley_2450": Keithley2450,
     "keithley_2000": Keithley2000, "sr830": SR830,
     "sr850": SR850, "lakeshore_335": LakeShore335, "lakeshore_625": LakeShore625,
-    "gigatronics_2420b": Gigatronics2420B, "lm510": LM510, "sim_source": SimSource,
+    "gigatronics_2420b": Gigatronics2420B, "lm510": LM510, "aotf_octal": AotfOctal,
+    "ysl_aotf": YslAotf, "ysl_sc_pro8": YslScPro8,
+    "sim_source": SimSource,
     "sim_magnet": SimMagnet, "sim_lockin": SimLockin,
 }
 # Lake Shore and Cryomagnetics instruments end replies with CR LF; the rest use LF.
@@ -34,6 +38,16 @@ async def build_device(name: str, d: DeviceCfg, others: dict[str, object]) -> ob
         if not isinstance(src, SimSource):
             raise ValueError(f"{name}: source {d.source!r} is not a sim_source")
         return SimLockin(name, src, d.gain, d.noise)
+    if isinstance(d, AotfCfg):           # USB through the vendor's DLL, not VISA
+        t = AotfLibraryTransport(int(d.resource[6:]), d.dll)
+        dev = _make(name, d, t)
+        await t.open()
+        return dev
+    if isinstance(d, (YslAotfCfg, YslScPro8Cfg)):   # raw bytes on a COM port, 9600 8N1
+        t = SerialBytesTransport(d.resource)
+        dev = _make(name, d, t)
+        await t.open()
+        return dev
     term = _TERMINATION.get(d.driver, "\n")
     t = VisaTransport(d.resource, read_termination=term, write_termination=term,
                       echo=getattr(d, "echo", False))
@@ -48,12 +62,20 @@ def check_settings(cfg: StationConfig) -> None:
     for name, d in cfg.devices.items():
         if hasattr(d, "resource"):
             try:
-                _make(name, d, VisaTransport(d.resource))
+                _make(name, d, _unopened(d))
             except ValueError as e:
                 raise ValueError(f"{name}: {e}") from None
 
 
-def _make(name: str, d: DeviceCfg, t: VisaTransport) -> object:
+def _unopened(d: DeviceCfg):
+    if isinstance(d, AotfCfg):
+        return AotfLibraryTransport()
+    if isinstance(d, (YslAotfCfg, YslScPro8Cfg)):
+        return SerialBytesTransport(d.resource)
+    return VisaTransport(d.resource)
+
+
+def _make(name: str, d: DeviceCfg, t) -> object:
     if isinstance(d, KeithleySMUCfg):
         return DRIVER_CLASSES[d.driver](name, t, d.mode, d.compliance, d.limits, d.nplc, source_range=d.source_range,
                                         sense_range=d.sense_range)
@@ -74,6 +96,13 @@ def _make(name: str, d: DeviceCfg, t: VisaTransport) -> object:
                                 d.freq_hz, d.max_power_dbm, d.settle_s)
     if isinstance(d, LM510Cfg):
         return LM510(name, t, d.channel, d.units)
+    if isinstance(d, AotfCfg):
+        cals = {m: read_calibration(p) for m, p in d.calibrations.items()}
+        return AotfOctal(name, t, cals, d.mode, d.channel, d.max_power, d.settle_s)
+    if isinstance(d, YslAotfCfg):
+        return YslAotf(name, t, d.calibration, d.max_power, d.settle_s)
+    if isinstance(d, YslScPro8Cfg):
+        return YslScPro8(name, t, d.max_power)
     raise ValueError(f"{name}: no builder for driver {d.driver!r}")
 
 

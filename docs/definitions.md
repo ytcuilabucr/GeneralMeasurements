@@ -66,9 +66,13 @@ attach = "sync"                    # run on connect, queries only
 check_mode = "active_mode"         # instrument's present mode; mismatch disables settings
 switch = "switch_mode"             # switch(mode, **settings)
 switch_confirm = "..."             # {mode}, {mode_label} available
-switch_settings = ["compliance", "limits", "max_rate"]
+switch_settings = ["compliance", "limits"]   # asked for in a dialog when switching
+switch_interlock = "!output"       # Switch mode… only while this is false / zero
 read_if = "output"                 # poll read() only while this bool property is true
-safe = "Ramp the level to 0 at max_rate, then output OFF"   # what safe_state() does
+safe = "Level 0 (one step), then output OFF"   # what safe_state() does
+# in a mode file: the dialog's pre-filled values when switching into that mode,
+# unless the station has [devices.X.modes.<mode>]
+# switch_defaults = { compliance = 1e-6, limits = [-1.0, 1.0] }
 groups = ["Source", "Measure"]     # display order of the property groups
 
 [properties.level]                 # the id: snake_case, stable

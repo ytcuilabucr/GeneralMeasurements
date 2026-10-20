@@ -4,6 +4,9 @@
 mode = "curr"
 info = "Sources current. Compliance {compliance:g} V; limits {limits[0]:g} … {limits[1]:g} A."
 
+# when switching into this mode, unless the station gives them
+switch_defaults = { compliance = 1.0, limits = [-1e-6, 1e-6] }  # V; A
+
 [properties.level]
 level = 0
 access = "both"
