@@ -14,6 +14,15 @@ Their Designer-editable settings are Qt properties (`label`, `curves`, `unit`).
 A widget name that would replace one of the class's methods or properties, or an
 attribute the instance already set before loading, is
 refused, so a rename in Designer can't silently break the code.
+
+For the type checker, form_types.py declares each form's attributes with their
+classes (`class ServerForm: btn_connect: QtWidgets.QPushButton ...`); the class
+that loads a form also derives from its declarations. form_types.py is
+generated from the .ui files: after changing a form in Designer, run
+
+    python -m gmcore.gui.common.uiload
+
+(tests/test_ui.py fails while it is out of date).
 """
 
 from __future__ import annotations
@@ -109,3 +118,77 @@ def load_ui(name: str, base: QtWidgets.QWidget) -> QtWidgets.QWidget:
         raise RuntimeError(f"{path.name}: {loader.errorString()}")
     icons.apply(base)                    # Material Design icons, by object name
     return w
+
+
+# -- declarations for the type checker (form_types.py) ---------------------------------------
+TYPES_PATH = Path(__file__).with_name("form_types.py")
+_QTGUI = {"QAction", "QActionGroup"}
+
+
+def form_class(name: str) -> str:
+    """'general_measurement' -> 'GeneralMeasurementForm'."""
+    return "".join(part.capitalize() for part in name.split("_")) + "Form"
+
+
+def _form_block(cls_name: str, doc: str, attrs: dict[str, str], custom: dict[str, str]) -> str:
+    lines = [f"class {cls_name}:", f'    """{doc}"""']
+    for obj, cls in sorted(attrs.items()):
+        if cls in custom:
+            qual = f"pyqtgraph.{cls}" if custom[cls] == "pyqtgraph" else cls
+        else:
+            qual = f"QtGui.{cls}" if cls in _QTGUI else f"QtWidgets.{cls}"
+        lines.append(f"    {obj}: {qual}")
+    return "\n".join(lines)
+
+
+def declarations() -> str:
+    """form_types.py's source: for each form, the attributes load_ui() sets."""
+    import xml.etree.ElementTree as ET
+
+    custom: dict[str, str] = {}                      # class -> module
+    body: list[str] = []
+    panel_forms: list[dict[str, str]] = []           # forms with a QWidget top level
+    for name, path in forms().items():
+        root = ET.parse(path).getroot()
+        for cw in root.iter("customwidget"):
+            custom[cw.findtext("class", "")] = cw.findtext("header", "")
+        top = root.find("widget")
+        attrs: dict[str, str] = {}
+        for el in root.iter():
+            obj = el.get("name", "")
+            if el is top or not obj:
+                continue
+            if el.tag in ("widget", "layout"):
+                attrs[obj] = el.get("class", "QWidget")
+            elif el.tag == "action":
+                attrs[obj] = "QAction"
+            elif el.tag == "actiongroup":
+                attrs[obj] = "QActionGroup"
+        if top is not None and top.get("class") == "QWidget":
+            panel_forms.append(attrs)
+        body.append(_form_block(form_class(name), path.name, attrs, custom))
+    # what every panel form has (the shared header and footer): Panel's own attributes
+    common = {k: v for k, v in panel_forms[0].items()
+              if all(f.get(k) == v for f in panel_forms[1:])} if panel_forms else {}
+    body.append(_form_block("PanelCommonForm", "every panel form (QWidget top level)",
+                            common, custom))
+    imports = ["import pyqtgraph", "from PySide6 import QtGui, QtWidgets"]
+    by_module: dict[str, list[str]] = {}
+    for cls, module in custom.items():
+        if module != "pyqtgraph":
+            by_module.setdefault(module, []).append(cls)
+    for module, names in sorted(by_module.items()):
+        imports.append(f"from {module} import {', '.join(sorted(names))}")
+    head = ('"""The widgets, layouts and actions each Designer form creates as attributes\n'
+            "(load_ui), for the type checker. Generated from gui/forms/*.ui by\n"
+            "`python -m gmcore.gui.common.uiload`: do not edit.\n"
+            '"""\n\n'
+            "from __future__ import annotations\n\n"
+            "from typing import TYPE_CHECKING\n\n"
+            "if TYPE_CHECKING:\n" + "".join(f"    {i}\n" for i in imports))
+    return head + "\n\n" + "\n\n\n".join(body) + "\n"
+
+
+if __name__ == "__main__":
+    TYPES_PATH.write_text(declarations(), "utf-8")
+    print(f"wrote {TYPES_PATH}")

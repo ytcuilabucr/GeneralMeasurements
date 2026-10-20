@@ -16,13 +16,14 @@ from __future__ import annotations
 import time
 from collections import deque
 
+from ..form_types import Lakeshore625Form
 from ..panels import Panel, parse_si
 from ..widgets import CardLabels, duration
 
 ACCENT = "#2e86c1"                      # also in lakeshore_625.ui's style sheet
 
 
-class LakeShore625Panel(Panel):
+class LakeShore625Panel(Panel, Lakeshore625Form):
     DEFAULT_INTERVAL = 0.5
     UI = "lakeshore_625"
 

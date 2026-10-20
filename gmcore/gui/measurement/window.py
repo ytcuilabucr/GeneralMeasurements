@@ -33,6 +33,7 @@ from ...plans import PlanError
 from ...sinks.liveplot import LivePlotSink, PlotBuffer
 from ...units import fmt
 from ..common import icons
+from ..common.form_types import GeneralMeasurementForm
 from ..common.uiload import load_ui
 from ..server.quick import _short
 
@@ -76,7 +77,7 @@ class _RunEvents(QtCore.QObject):
             self.item.emit(item)
 
 
-class GeneralMeasurementWindow(QtWidgets.QMainWindow):
+class GeneralMeasurementWindow(QtWidgets.QMainWindow, GeneralMeasurementForm):
     def __init__(self, server):
         super().__init__()
         self.server = server

@@ -133,5 +133,5 @@ def add_menu(window: QtWidgets.QMainWindow) -> QtWidgets.QMenu:
     menu.setObjectName("menuMiscellaneous")
     menu.addSection("Theme")
     hub.changed.connect(_Choices(menu).show_mode)
-    window.menuMiscellaneous = menu
+    setattr(window, "menuMiscellaneous", menu)     # any QMainWindow: not a declared attribute
     return menu

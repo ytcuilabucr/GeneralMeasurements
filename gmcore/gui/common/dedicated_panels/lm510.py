@@ -18,6 +18,7 @@ from collections import deque
 
 from PySide6 import QtCore
 
+from ..form_types import Lm510Form
 from ..panels import Panel
 from ..widgets import CardLabels, duration, slope_per_s
 
@@ -25,7 +26,7 @@ ACCENT = "#17a589"                      # also in lm510.ui's style sheet
 FITS = {"1 h": 3600.0, "6 h": 6 * 3600.0, "24 h": 86400.0}   # the .ui's fit combo texts
 
 
-class LM510Panel(Panel):
+class LM510Panel(Panel, Lm510Form):
     DEFAULT_INTERVAL = 10.0
     MAX_INTERVAL = 600.0
     UI = "lm510"

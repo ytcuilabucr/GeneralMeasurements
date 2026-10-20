@@ -27,6 +27,7 @@ from ...devices.definitions import (LEVELS, Definition, Prop, bounds, choices, d
                                     read_connect, run, text, write)
 from ...units import SI_UNITS, fmt, parse_si
 from . import icons
+from .form_types import PanelCommonForm
 from .uiload import load_ui
 from .widgets import Fold, Led
 
@@ -113,7 +114,7 @@ class TrendChart(QtCore.QObject):
 
 
 # -- base ------------------------------------------------------------------------
-class Panel(QtWidgets.QWidget):
+class Panel(QtWidgets.QWidget, PanelCommonForm):
     """Shared plumbing. Subclasses override build_controls(), attach(),
     after_attach() and, if needed, read_coro(). A panel with its own look has its
     own form (UI = "<name>" for a ui/<name>.ui form, with the same header and footer
@@ -133,8 +134,7 @@ class Panel(QtWidgets.QWidget):
     ctrl_box: QtWidgets.QGroupBox | None = None    # in the form, if it has a Control box
     form: QtWidgets.QFormLayout | None = None
     charts_split: QtWidgets.QSplitter | None = None   # in the form, if it has charts
-    btn_update: QtWidgets.QPushButton | None = None   # in the form: Update settings
-    read_time: QtWidgets.QLabel | None = None         # in the form: how long a read takes
+    readings: QtWidgets.QGridLayout             # panel.ui only: the default look's readings
     MIN_INTERVAL = 0.02                         # s; the read time is the real limit
 
     def __init__(self, name: str, cfg, station):
@@ -166,8 +166,7 @@ class Panel(QtWidgets.QWidget):
         self.btn_read.clicked.connect(self.poll)
         self.btn_safe.setToolTip(self.safe_tip())
         self.btn_safe.clicked.connect(self.safe)
-        if self.btn_update is not None:
-            self.btn_update.clicked.connect(self.update_settings)
+        self.btn_update.clicked.connect(self.update_settings)
 
         self.timer = QtCore.QTimer(self)
         self.timer.setInterval(int(self.DEFAULT_INTERVAL * 1000))
@@ -397,8 +396,6 @@ class Panel(QtWidgets.QWidget):
     def _show_read_time(self) -> None:
         """`read 85 ms` next to the interval; amber once reads take most of it (the
         next poll waits for the read, so the interval can't be shorter)."""
-        if self.read_time is None:
-            return
         avg = self.read_time_s()
         if avg is None:
             self.read_time.setText("")

@@ -32,6 +32,7 @@ from ..common.panels import Panel, detail_actions
 from ..common.registry import panel_for
 from ..common import appsettings, icons, theme
 from ..common.appsettings import CONFIG_DIR
+from ..common.form_types import PanelWindowForm, ServerForm
 from ..common.uiload import load_ui
 from ..common.widgets import Led, MenuPicker
 from ..common.worker import AsyncWorker
@@ -93,6 +94,15 @@ class InstrumentRow:
     """One instrument: its config entry, its widgets, and (once connected or
     opened) its panel."""
 
+    # the table's widgets for this row, made by InstrumentServer._add_row_widgets
+    address: QtWidgets.QLabel
+    name_edit: QtWidgets.QLineEdit
+    driver_menu: MenuPicker
+    led: Led
+    btn_connect: QtWidgets.QPushButton
+    btn_safe: QtWidgets.QPushButton
+    btn_open: QtWidgets.QPushButton
+
     def __init__(self, name: str, data: dict[str, Any]):
         self.name = self.saved_name = name           # saved_name: its key in the file
         self.driver = self.saved_driver = data["driver"]
@@ -121,7 +131,7 @@ class InstrumentRow:
         return self.connected or self.state == "connecting…"
 
 
-class PanelWindow(QtWidgets.QMainWindow):
+class PanelWindow(QtWidgets.QMainWindow, PanelWindowForm):
     """One instrument's panel (panel_window.ui). Closing it only hides it: the
     connection belongs to the server's table."""
 
@@ -140,11 +150,12 @@ class PanelWindow(QtWidgets.QMainWindow):
             self.show_bar.hide()
 
 
-class InstrumentServer(QtWidgets.QMainWindow):
+class InstrumentServer(QtWidgets.QMainWindow, ServerForm):
     """The table of instruments, the File menu and the log (server.ui). Panels use
     it as their station: `log`, `worker` and `devices`."""
 
     instruments_changed = QtCore.Signal()      # an instrument connected or disconnected
+    menuMiscellaneous: QtWidgets.QMenu         # added by theme.add_menu
 
     def __init__(self, path: str | Path | None = None,
                  settings: appsettings.MiscSettings | QtCore.QSettings | None = None):

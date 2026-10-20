@@ -17,6 +17,7 @@ from collections import deque
 
 from PySide6 import QtWidgets
 
+from ..form_types import Lakeshore335Form
 from ..panels import Panel
 from ..widgets import CardLabels, is_stable, slope_per_s
 
@@ -24,7 +25,7 @@ ACCENT = "#d35400"                      # also in lakeshore_335.ui's style sheet
 RANGES = ("Off", "Low", "Med", "High")
 
 
-class LakeShore335Panel(Panel):
+class LakeShore335Panel(Panel, Lakeshore335Form):
     UI = "lakeshore_335"
 
     def setup_ui(self):

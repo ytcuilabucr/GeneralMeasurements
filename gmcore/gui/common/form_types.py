@@ -1,0 +1,435 @@
+"""The widgets, layouts and actions each Designer form creates as attributes
+(load_ui), for the type checker. Generated from gui/forms/*.ui by
+`python -m gmcore.gui.common.uiload`: do not edit.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pyqtgraph
+    from PySide6 import QtGui, QtWidgets
+    from gmcore.gui.common.panels import SIEdit
+    from gmcore.gui.common.widgets import CsvLog, DewarGauge, FieldBar, Led, TimeChart
+
+
+class FieldPickerForm:
+    """field_picker.ui"""
+    buttons: QtWidgets.QDialogButtonBox
+    hint: QtWidgets.QLabel
+    lay: QtWidgets.QVBoxLayout
+    table: QtWidgets.QTableWidget
+
+
+class GeneralMeasurementForm:
+    """general_measurement.ui"""
+    actionAbort: QtGui.QAction
+    actionCloseWindow: QtGui.QAction
+    actionDryRun: QtGui.QAction
+    actionNew: QtGui.QAction
+    actionOpenSequence: QtGui.QAction
+    actionPause: QtGui.QAction
+    actionRun: QtGui.QAction
+    actionSaveSequence: QtGui.QAction
+    actionSaveSequenceAs: QtGui.QAction
+    after: QtWidgets.QComboBox
+    after_label: QtWidgets.QLabel
+    bottom: QtWidgets.QWidget
+    bottom_lay: QtWidgets.QVBoxLayout
+    btn_abort: QtWidgets.QPushButton
+    btn_add_log: QtWidgets.QPushButton
+    btn_add_step: QtWidgets.QPushButton
+    btn_browse: QtWidgets.QPushButton
+    btn_dry_run: QtWidgets.QPushButton
+    btn_item_add: QtWidgets.QPushButton
+    btn_item_remove: QtWidgets.QPushButton
+    btn_log_down: QtWidgets.QPushButton
+    btn_log_remove: QtWidgets.QPushButton
+    btn_log_up: QtWidgets.QPushButton
+    btn_pause: QtWidgets.QPushButton
+    btn_run: QtWidgets.QPushButton
+    btn_step_down: QtWidgets.QPushButton
+    btn_step_remove: QtWidgets.QPushButton
+    btn_step_up: QtWidgets.QPushButton
+    center_label: QtWidgets.QLabel
+    central_lay: QtWidgets.QVBoxLayout
+    centralwidget: QtWidgets.QWidget
+    channel_box: QtWidgets.QGroupBox
+    channel_info: QtWidgets.QLabel
+    channel_lay: QtWidgets.QVBoxLayout
+    channel_opts: QtWidgets.QGroupBox
+    channel_opts_form: QtWidgets.QFormLayout
+    comment: QtWidgets.QLineEdit
+    comment_label: QtWidgets.QLabel
+    data_dir: QtWidgets.QLineEdit
+    data_dir_label: QtWidgets.QLabel
+    data_dir_row: QtWidgets.QHBoxLayout
+    estimate: QtWidgets.QLabel
+    instruments: QtWidgets.QTreeWidget
+    instruments_box: QtWidgets.QGroupBox
+    instruments_buttons: QtWidgets.QHBoxLayout
+    instruments_hint: QtWidgets.QLabel
+    instruments_lay: QtWidgets.QVBoxLayout
+    interpolation: QtWidgets.QComboBox
+    interpolation_label: QtWidgets.QLabel
+    item_buttons: QtWidgets.QHBoxLayout
+    item_center: SIEdit
+    item_form: QtWidgets.QFormLayout
+    item_list: QtWidgets.QListWidget
+    item_span: SIEdit
+    item_start: SIEdit
+    item_step: SIEdit
+    item_stop: SIEdit
+    lists: QtWidgets.QWidget
+    lists_lay: QtWidgets.QVBoxLayout
+    live_plot: pyqtgraph.PlotWidget
+    log_box: QtWidgets.QGroupBox
+    log_buttons: QtWidgets.QHBoxLayout
+    log_lay: QtWidgets.QVBoxLayout
+    log_list: QtWidgets.QListWidget
+    meas_name: QtWidgets.QLineEdit
+    menuFile: QtWidgets.QMenu
+    menuRun: QtWidgets.QMenu
+    menubar: QtWidgets.QMenuBar
+    n_points: QtWidgets.QSpinBox
+    n_points_label: QtWidgets.QLabel
+    name_label: QtWidgets.QLabel
+    plot_area: QtWidgets.QWidget
+    plot_head: QtWidgets.QHBoxLayout
+    plot_lay: QtWidgets.QVBoxLayout
+    plot_y: QtWidgets.QComboBox
+    plot_y_label: QtWidgets.QLabel
+    progress: QtWidgets.QProgressBar
+    range_type: QtWidgets.QComboBox
+    range_type_label: QtWidgets.QLabel
+    run_box: QtWidgets.QGroupBox
+    run_grid: QtWidgets.QGridLayout
+    run_row: QtWidgets.QHBoxLayout
+    settle: QtWidgets.QDoubleSpinBox
+    settle_label: QtWidgets.QLabel
+    snake: QtWidgets.QCheckBox
+    span_label: QtWidgets.QLabel
+    split_h: QtWidgets.QSplitter
+    split_v: QtWidgets.QSplitter
+    start_label: QtWidgets.QLabel
+    statusbar: QtWidgets.QStatusBar
+    step_box: QtWidgets.QGroupBox
+    step_buttons: QtWidgets.QHBoxLayout
+    step_lay: QtWidgets.QVBoxLayout
+    step_list: QtWidgets.QTreeWidget
+    step_size_label: QtWidgets.QLabel
+    step_type: QtWidgets.QComboBox
+    step_type_label: QtWidgets.QLabel
+    stop_label: QtWidgets.QLabel
+
+
+class Lakeshore335Form:
+    """lakeshore_335.ui"""
+    btn_connect: QtWidgets.QPushButton
+    btn_disconnect: QtWidgets.QPushButton
+    btn_hold: QtWidgets.QPushButton
+    btn_ramp: QtWidgets.QPushButton
+    btn_read: QtWidgets.QPushButton
+    btn_safe: QtWidgets.QPushButton
+    btn_update: QtWidgets.QPushButton
+    cardA: QtWidgets.QFrame
+    cardA_caption: QtWidgets.QLabel
+    cardA_extra: QtWidgets.QHBoxLayout
+    cardA_lay: QtWidgets.QVBoxLayout
+    cardA_sub: QtWidgets.QLabel
+    cardA_value: QtWidgets.QLabel
+    cardB: QtWidgets.QFrame
+    cardB_caption: QtWidgets.QLabel
+    cardB_extra: QtWidgets.QHBoxLayout
+    cardB_lay: QtWidgets.QVBoxLayout
+    cardB_sub: QtWidgets.QLabel
+    cardB_value: QtWidgets.QLabel
+    cardHeat: QtWidgets.QFrame
+    cardHeat_caption: QtWidgets.QLabel
+    cardHeat_lay: QtWidgets.QVBoxLayout
+    cardHeat_sub: QtWidgets.QLabel
+    cardHeat_value: QtWidgets.QLabel
+    cardSp: QtWidgets.QFrame
+    cardSp_caption: QtWidgets.QLabel
+    cardSp_lay: QtWidgets.QVBoxLayout
+    cardSp_sub: QtWidgets.QLabel
+    cardSp_value: QtWidgets.QLabel
+    cards: QtWidgets.QHBoxLayout
+    chart: TimeChart
+    fit: QtWidgets.QDoubleSpinBox
+    fit_label: QtWidgets.QLabel
+    foot: QtWidgets.QHBoxLayout
+    for_label: QtWidgets.QLabel
+    head: QtWidgets.QHBoxLayout
+    heat_bar: QtWidgets.QProgressBar
+    heat_box: QtWidgets.QGroupBox
+    heat_form: QtWidgets.QFormLayout
+    info: QtWidgets.QLabel
+    interval: QtWidgets.QDoubleSpinBox
+    live: QtWidgets.QCheckBox
+    log: CsvLog
+    low: QtWidgets.QHBoxLayout
+    mon: QtWidgets.QHBoxLayout
+    pid: QtWidgets.QLabel
+    pid_label: QtWidgets.QLabel
+    ramp_state: QtWidgets.QLabel
+    ramp_state_label: QtWidgets.QLabel
+    range_0: QtWidgets.QPushButton
+    range_1: QtWidgets.QPushButton
+    range_2: QtWidgets.QPushButton
+    range_3: QtWidgets.QPushButton
+    range_label: QtWidgets.QLabel
+    range_row: QtWidgets.QHBoxLayout
+    rate: SIEdit
+    rate_A: QtWidgets.QLabel
+    rate_B: QtWidgets.QLabel
+    rate_unit: QtWidgets.QLabel
+    read_time: QtWidgets.QLabel
+    root: QtWidgets.QVBoxLayout
+    sp: SIEdit
+    sp_box: QtWidgets.QGroupBox
+    sp_buttons: QtWidgets.QHBoxLayout
+    sp_form: QtWidgets.QFormLayout
+    sp_label: QtWidgets.QLabel
+    sp_row: QtWidgets.QHBoxLayout
+    sp_unit: QtWidgets.QLabel
+    stable_A: Led
+    stable_B: Led
+    stable_win: QtWidgets.QDoubleSpinBox
+    status: QtWidgets.QLabel
+    title: QtWidgets.QLabel
+    tol: QtWidgets.QDoubleSpinBox
+    tol_label: QtWidgets.QLabel
+
+
+class Lakeshore625Form:
+    """lakeshore_625.ui"""
+    at_label: QtWidgets.QLabel
+    bar: FieldBar
+    btn_connect: QtWidgets.QPushButton
+    btn_disconnect: QtWidgets.QPushButton
+    btn_hold: QtWidgets.QPushButton
+    btn_ramp: QtWidgets.QPushButton
+    btn_read: QtWidgets.QPushButton
+    btn_safe: QtWidgets.QPushButton
+    btn_update: QtWidgets.QPushButton
+    btn_zero: QtWidgets.QPushButton
+    buffer: QtWidgets.QSpinBox
+    buffer_label: QtWidgets.QLabel
+    cardI: QtWidgets.QFrame
+    cardI_caption: QtWidgets.QLabel
+    cardI_lay: QtWidgets.QVBoxLayout
+    cardI_sub: QtWidgets.QLabel
+    cardI_value: QtWidgets.QLabel
+    cardMain: QtWidgets.QFrame
+    cardMain_caption: QtWidgets.QLabel
+    cardMain_lay: QtWidgets.QVBoxLayout
+    cardMain_sub: QtWidgets.QLabel
+    cardMain_value: QtWidgets.QLabel
+    cardV: QtWidgets.QFrame
+    cardV_caption: QtWidgets.QLabel
+    cardV_lay: QtWidgets.QVBoxLayout
+    cardV_sub: QtWidgets.QLabel
+    cardV_value: QtWidgets.QLabel
+    chart: TimeChart
+    eta: QtWidgets.QLabel
+    foot: QtWidgets.QHBoxLayout
+    head: QtWidgets.QHBoxLayout
+    info: QtWidgets.QLabel
+    interval: QtWidgets.QDoubleSpinBox
+    led_err: Led
+    led_psh: Led
+    led_ramp: Led
+    led_stable: Led
+    lights: QtWidgets.QGroupBox
+    lights_lay: QtWidgets.QVBoxLayout
+    live: QtWidgets.QCheckBox
+    log: CsvLog
+    low: QtWidgets.QHBoxLayout
+    mon_box: QtWidgets.QGroupBox
+    mon_form: QtWidgets.QFormLayout
+    prog: QtWidgets.QHBoxLayout
+    progress: QtWidgets.QProgressBar
+    progress_label: QtWidgets.QLabel
+    ramp_box: QtWidgets.QGroupBox
+    ramp_buttons: QtWidgets.QHBoxLayout
+    ramp_form: QtWidgets.QFormLayout
+    rate: SIEdit
+    read_time: QtWidgets.QLabel
+    root: QtWidgets.QVBoxLayout
+    side: QtWidgets.QVBoxLayout
+    status: QtWidgets.QLabel
+    target: SIEdit
+    target_label: QtWidgets.QLabel
+    target_row: QtWidgets.QHBoxLayout
+    title: QtWidgets.QLabel
+    tol: QtWidgets.QDoubleSpinBox
+    tol_label: QtWidgets.QLabel
+    top: QtWidgets.QHBoxLayout
+    unit_r: QtWidgets.QLabel
+    unit_t: QtWidgets.QLabel
+
+
+class Lm510Form:
+    """lm510.ui"""
+    btn_connect: QtWidgets.QPushButton
+    btn_disconnect: QtWidgets.QPushButton
+    btn_measure: QtWidgets.QPushButton
+    btn_read: QtWidgets.QPushButton
+    btn_safe: QtWidgets.QPushButton
+    btn_set_interval: QtWidgets.QPushButton
+    btn_update: QtWidgets.QPushButton
+    cardBoil: QtWidgets.QFrame
+    cardBoil_caption: QtWidgets.QLabel
+    cardBoil_extra: QtWidgets.QHBoxLayout
+    cardBoil_lay: QtWidgets.QVBoxLayout
+    cardBoil_sub: QtWidgets.QLabel
+    cardBoil_value: QtWidgets.QLabel
+    cardLeft: QtWidgets.QFrame
+    cardLeft_caption: QtWidgets.QLabel
+    cardLeft_lay: QtWidgets.QVBoxLayout
+    cardLeft_sub: QtWidgets.QLabel
+    cardLeft_value: QtWidgets.QLabel
+    cardLevel: QtWidgets.QFrame
+    cardLevel_caption: QtWidgets.QLabel
+    cardLevel_lay: QtWidgets.QVBoxLayout
+    cardLevel_sub: QtWidgets.QLabel
+    cardLevel_value: QtWidgets.QLabel
+    cards: QtWidgets.QHBoxLayout
+    chart: TimeChart
+    dewar: DewarGauge
+    fit: QtWidgets.QComboBox
+    fit_label: QtWidgets.QLabel
+    foot: QtWidgets.QHBoxLayout
+    head: QtWidgets.QHBoxLayout
+    info: QtWidgets.QLabel
+    interval: QtWidgets.QDoubleSpinBox
+    interval_row: QtWidgets.QHBoxLayout
+    last: QtWidgets.QLabel
+    live: QtWidgets.QCheckBox
+    log: CsvLog
+    measure_row: QtWidgets.QHBoxLayout
+    meter_interval: QtWidgets.QDoubleSpinBox
+    meter_interval_label: QtWidgets.QLabel
+    mode_box: QtWidgets.QGroupBox
+    mode_c: QtWidgets.QRadioButton
+    mode_form: QtWidgets.QFormLayout
+    mode_label: QtWidgets.QLabel
+    mode_row: QtWidgets.QHBoxLayout
+    mode_sh: QtWidgets.QRadioButton
+    read_time: QtWidgets.QLabel
+    right: QtWidgets.QVBoxLayout
+    root: QtWidgets.QVBoxLayout
+    status: QtWidgets.QLabel
+    title: QtWidgets.QLabel
+    top: QtWidgets.QHBoxLayout
+
+
+class PanelForm:
+    """panel.ui"""
+    btn_connect: QtWidgets.QPushButton
+    btn_disconnect: QtWidgets.QPushButton
+    btn_read: QtWidgets.QPushButton
+    btn_safe: QtWidgets.QPushButton
+    btn_update: QtWidgets.QPushButton
+    charts_split: QtWidgets.QSplitter
+    ctrl_box: QtWidgets.QGroupBox
+    ctrl_head: QtWidgets.QHBoxLayout
+    ctrl_lay: QtWidgets.QVBoxLayout
+    foot: QtWidgets.QHBoxLayout
+    form: QtWidgets.QFormLayout
+    head: QtWidgets.QHBoxLayout
+    info: QtWidgets.QLabel
+    interval: QtWidgets.QDoubleSpinBox
+    live: QtWidgets.QCheckBox
+    main_split: QtWidgets.QSplitter
+    read_box: QtWidgets.QGroupBox
+    read_time: QtWidgets.QLabel
+    readings: QtWidgets.QGridLayout
+    root: QtWidgets.QVBoxLayout
+    status: QtWidgets.QLabel
+    title: QtWidgets.QLabel
+    upper: QtWidgets.QWidget
+    upper_lay: QtWidgets.QVBoxLayout
+
+
+class PanelWindowForm:
+    """panel_window.ui"""
+    central_lay: QtWidgets.QVBoxLayout
+    centralwidget: QtWidgets.QWidget
+    scroll_area: QtWidgets.QScrollArea
+    scroll_contents: QtWidgets.QWidget
+    show_bar: QtWidgets.QToolBar
+
+
+class ServerForm:
+    """server.ui"""
+    actionExit: QtGui.QAction
+    actionGeneralMeasurement: QtGui.QAction
+    actionOpen: QtGui.QAction
+    actionSave: QtGui.QAction
+    actionSaveAs: QtGui.QAction
+    add_row: QtWidgets.QHBoxLayout
+    btn_add: QtWidgets.QPushButton
+    btn_connect_all: QtWidgets.QPushButton
+    btn_disconnect_all: QtWidgets.QPushButton
+    btn_quick_settings: QtWidgets.QPushButton
+    btn_safe_all: QtWidgets.QPushButton
+    central_lay: QtWidgets.QVBoxLayout
+    centralwidget: QtWidgets.QWidget
+    config_lay: QtWidgets.QVBoxLayout
+    config_tab: QtWidgets.QWidget
+    grid: QtWidgets.QGridLayout
+    head_address: QtWidgets.QLabel
+    head_connect: QtWidgets.QLabel
+    head_connection: QtWidgets.QLabel
+    head_driver: QtWidgets.QLabel
+    head_name: QtWidgets.QLabel
+    head_panel: QtWidgets.QLabel
+    head_safe: QtWidgets.QLabel
+    log_view: QtWidgets.QTextEdit
+    menuFile: QtWidgets.QMenu
+    menuWindow: QtWidgets.QMenu
+    menubar: QtWidgets.QMenuBar
+    quick_blocks: QtWidgets.QVBoxLayout
+    quick_body: QtWidgets.QWidget
+    quick_empty: QtWidgets.QLabel
+    quick_head: QtWidgets.QHBoxLayout
+    quick_hint: QtWidgets.QLabel
+    quick_lay: QtWidgets.QVBoxLayout
+    quick_scroll: QtWidgets.QScrollArea
+    quick_tab: QtWidgets.QWidget
+    split: QtWidgets.QSplitter
+    statusbar: QtWidgets.QStatusBar
+    table: QtWidgets.QWidget
+    table_scroll: QtWidgets.QScrollArea
+    tabs: QtWidgets.QTabWidget
+    top: QtWidgets.QWidget
+    top_lay: QtWidgets.QVBoxLayout
+
+
+class ViewWindowForm:
+    """view_window.ui"""
+    actionFields: QtGui.QAction
+    actionStation: QtGui.QAction
+    centralwidget: QtWidgets.QWidget
+    tools: QtWidgets.QToolBar
+
+
+class PanelCommonForm:
+    """every panel form (QWidget top level)"""
+    btn_connect: QtWidgets.QPushButton
+    btn_disconnect: QtWidgets.QPushButton
+    btn_read: QtWidgets.QPushButton
+    btn_safe: QtWidgets.QPushButton
+    btn_update: QtWidgets.QPushButton
+    foot: QtWidgets.QHBoxLayout
+    head: QtWidgets.QHBoxLayout
+    info: QtWidgets.QLabel
+    interval: QtWidgets.QDoubleSpinBox
+    live: QtWidgets.QCheckBox
+    read_time: QtWidgets.QLabel
+    root: QtWidgets.QVBoxLayout
+    status: QtWidgets.QLabel
+    title: QtWidgets.QLabel

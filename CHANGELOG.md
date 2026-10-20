@@ -346,6 +346,13 @@ read-only queries to the Lake Shore 335, 625, Giga-tronics 2420B and SR850.
   `open()`, and devices typed as `object` in plans/runner. Clear these, make
   the job blocking, then move `devices/`, `engine/`, `plans/` to strict
   (~300 more, mostly missing annotations).
+- The type-check job installs the GUI extras, so the GUI code is checked
+  against PySide6's types. Designer forms' widgets are declared for pyright
+  in `gui/common/form_types.py`, generated from the `.ui` files
+  (`python -m gmcore.gui.common.uiload`; `tests/test_ui.py` checks that it is
+  up to date). `InstrumentRow` declares its table widgets. With the GUI
+  packages installed, pyright went from 527 errors to 162; the rest are other
+  kinds (None checks, untyped h5py/pyvisa returns, override signatures).
 
 ### Known gaps
 - SR850 (GPIB 8) stopped answering everything but `OUTP?` (which reads 0)

@@ -19,6 +19,7 @@ from PySide6 import QtCore, QtWidgets
 
 from ..common.hub import DataHub, Field
 from ..common.panels import fmt, parse_si
+from ..common.form_types import FieldPickerForm, ViewWindowForm
 from ..common.uiload import load_ui
 from ..common.widgets import Card, TimeChart
 
@@ -57,7 +58,7 @@ class ViewField:
 
 
 # -- picker ------------------------------------------------------------------------------
-class FieldPicker(QtWidgets.QDialog):
+class FieldPicker(QtWidgets.QDialog, FieldPickerForm):
     """Choose fields (and, for a monitor, alarm thresholds) from the hub's list
     (field_picker.ui)."""
 
@@ -218,7 +219,7 @@ class ChartView(TimeChart):
 
 
 # -- window ----------------------------------------------------------------------------------
-class ViewWindow(QtWidgets.QMainWindow):
+class ViewWindow(QtWidgets.QMainWindow, ViewWindowForm):
     """A monitor or chart in its own window (one QtAds dock, so it floats and its
     layout is saved like the instrument windows'). Closing it deletes it."""
 

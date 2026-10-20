@@ -183,3 +183,15 @@ def test_no_qtawesome_means_no_icons_not_an_error(app, monkeypatch):
     assert icons.icon("connect").isNull()
     w = QtWidgets.QMainWindow()
     uiload.load_ui("panel_window", w)                         # forms still load
+
+
+def test_form_types_are_up_to_date():
+    """form_types.py declares what each form creates; regenerate it after a
+    Designer change with `python -m gmcore.gui.common.uiload`."""
+    assert uiload.TYPES_PATH.read_text("utf-8") == uiload.declarations(), \
+        "gui/common/form_types.py is out of date: run python -m gmcore.gui.common.uiload"
+    from gmcore.gui.common import form_types
+    for name in FORMS:                               # one declaration class per form
+        assert hasattr(form_types, uiload.form_class(name)), name
+    common = form_types.PanelCommonForm.__annotations__
+    assert {"btn_connect", "btn_safe", "btn_update", "read_time", "interval"} <= set(common)

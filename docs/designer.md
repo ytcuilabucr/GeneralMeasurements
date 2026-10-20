@@ -46,6 +46,11 @@ The code fills what depends on the config or the driver:
 - **Names are the contract.** The code reaches widgets by their object name (`btn_connect`, `cardA_value`, `actionSave`). Renaming one in Designer breaks the code that uses it, and `tests/test_ui.py` checks that every named widget loads. Rename freely the widgets the code doesn't use, such as labels and spacers.
 - **Every panel form has the same header and footer names:** `title`, `status`, `btn_connect`, `btn_disconnect`, `info`, `live`, `interval`, `btn_read`, `btn_safe`. The standard panel also has `readings` (grid), `ctrl_box` and `form` (the Control box), `btn_update` (Update settings; the cryostat forms have one too), `main_split` and `charts_split` (the splitters; the code adds the folded charts to `charts_split`).
 - **Names that would hide a method, or data the code set before loading (`charts`, `rows`), are refused at load.** For example, `close`, `move`, `scroll` or `update` would replace Qt or panel methods, and the panel would break in confusing ways. The loader stops with "would replace a method; rename it in Designer".
+- **After changing a form, regenerate its type declarations:**
+  `python -m gmcore.gui.common.uiload`. This rewrites `gmcore/gui/common/form_types.py`.
+  - **What it holds:** one class per form (`ServerForm`, `PanelWindowForm`, …) listing every named widget, layout and action with its class. It also has `PanelCommonForm`, the header and footer that every panel form shares.
+  - **How the code uses it:** the class that loads a form also derives from that form's class, so pyright knows the attributes. The declaration classes are plain annotations, with no effect at run time.
+  - **If you forget:** `tests/test_ui.py` fails while the file is out of date.
 - **Cards** (the big-number boxes on the cryostat panels) are plain `QFrame`s with the dynamic property `card = true`. Each holds labels named `<frame>_caption`, `<frame>_value` and `<frame>_sub`, and anything else you like. Style them with the form's style sheet (`QFrame[card="true"]`).
 - **The accent colour** of a cryostat panel is in its form's top-level style sheet. Change it there and in the module's `ACCENT` constant (used for drawing).
 
