@@ -10,6 +10,10 @@
     [quick_view]
     hidden = ["Keithley 2400 - 1.i"]     # readings hidden in the Quick view
 
+    [process]
+    priority = "high"                    # normal / above_normal / high (gmcore/process.py)
+    cores = [2, 3]                       # logical processors; empty = all
+
 The GUI writes it whenever a setting changes, keeping comments and layout; it
 can also be edited by hand while the app is closed. A missing or unreadable
 file means the defaults. The instrument configs themselves stay in their own

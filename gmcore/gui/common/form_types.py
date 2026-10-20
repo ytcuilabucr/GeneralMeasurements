@@ -88,6 +88,9 @@ class GeneralMeasurementForm:
     log_buttons: QtWidgets.QHBoxLayout
     log_lay: QtWidgets.QVBoxLayout
     log_list: QtWidgets.QListWidget
+    log_source: QtWidgets.QComboBox
+    log_source_info: QtWidgets.QLabel
+    log_source_label: QtWidgets.QLabel
     meas_name: QtWidgets.QLineEdit
     menuFile: QtWidgets.QMenu
     menuRun: QtWidgets.QMenu

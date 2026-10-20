@@ -72,8 +72,8 @@ class Scan:
         total, prev = 0.0, {}
         for _, _, sp in self.points():
             moved = [a for a in self.axes if prev.get(a.device) != sp[a.device]]
-            if moved:
-                total += move_s + max(a.settle_s for a in moved)
+            for stage in sorted({a.stage for a in moved}):
+                total += move_s + max(a.settle_s for a in moved if a.stage == stage)
             total += read_s
             prev = sp
         return total
@@ -81,7 +81,8 @@ class Scan:
     def to_dict(self) -> dict:
         """JSON-able description of the plan (stored in the data file)."""
         return {"mode": "stepped", "axes": [{"device": a.device, "points": list(a.points),
-                          "settle_s": a.settle_s, "snake": a.snake} for a in self.axes],
+                          "settle_s": a.settle_s, "snake": a.snake,
+                          **({"stage": a.stage} if a.stage else {})} for a in self.axes],
                 "readables": list(self.readables), "shape": list(self.shape),
                 "metadata": dict(self.metadata)}
 

@@ -50,7 +50,7 @@ ICONS: dict[str, str] = {
     # instruments (window icons)
     "app": "mdi6.lan", "smu": "mdi6.flash", "dmm": "mdi6.gauge",
     "lockin": "mdi6.sine-wave", "temperature": "mdi6.thermometer",
-    "magnet": "mdi6.magnet", "light": "mdi6.spotlight-beam", "laser": "mdi6.laser-pointer", "helium": "mdi6.water-percent", "rf": "mdi6.radio-tower",
+    "magnet": "mdi6.magnet", "light": "mdi6.spotlight-beam", "laser": "mdi6.laser-pointer", "timer": "mdi6.timer-outline", "helium": "mdi6.water-percent", "rf": "mdi6.radio-tower",
     "sim": "mdi6.flask-outline", "instrument": "mdi6.flask-outline",
 }
 # roles drawn in a colour of their own (others follow the palette)

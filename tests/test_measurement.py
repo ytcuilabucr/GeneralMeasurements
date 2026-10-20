@@ -246,3 +246,53 @@ def test_a_disconnected_channel_is_marked_and_refused(server):
     _wait(app, lambda: "gate.value" not in m.channels)
     assert "not connected" in m.step_list.topLevelItem(0).text(0)
     assert "not a settable channel" in m.estimate.text()
+
+
+def test_window_time_trace_samples_the_register(server, tmp_path, monkeypatch):
+    """Timer inner loop, a gate value in the outer loop; the lock-in's panel polls
+    at 0.2 s, the Timer steps 0.05 s: auto samples the server's register."""
+    app, s = server
+    lockin = s.row("lockin").panel
+    lockin.interval.setValue(0.2)
+    lockin.live.setChecked(True)
+    _wait(app, lambda: lockin.read_time_s() is not None)        # the register fills
+    reads = []
+    dev = s.devices["lockin"]
+    real = dev.read
+
+    async def counted():
+        reads.append(1)
+        return await real()
+    dev.read = counted
+
+    m = s.open_measurement()
+    m.add_step("Timer.timer")
+    m.range_type.setCurrentIndex(m.range_type.findData("start_stop"))
+    _edit(m.item_start, "0")
+    _edit(m.item_stop, "0.5")
+    m.n_points.setValue(11)
+    m.add_step("gate.value")                     # the outer value, set once per pass
+    m.range_type.setCurrentIndex(m.range_type.findData("start_stop"))
+    _edit(m.item_start, "0")
+    _edit(m.item_stop, "1")
+    m.n_points.setValue(2)
+    m.add_log("Timer.clock")
+    m.add_log("lockin.x")
+    assert "lockin: server register (panel reads every 0.2 s)" in m.log_source_info.text()
+    assert "about 1 s" in m.estimate.text()      # two passes of 0.5 s
+    m._meta_changed(name="trace", data_dir=str(tmp_path))
+    _yes(monkeypatch)
+    polls_before = len(reads)
+    assert m.start()
+    _wait(app, lambda: not m.running)
+    assert m.buffer.n == 22
+    # only the panel read the lock-in: about one poll per 0.2 s of the ~1 s run
+    assert len(reads) - polls_before <= 8
+    h5py = pytest.importorskip("h5py")
+    with h5py.File(m.run_path) as f:
+        clock = f["data/Timer.clock"][...]
+        age = f["data/lockin.sample_age"][...]
+    assert clock.shape == (2, 11) and abs(clock[0, 10] - 0.5) < 0.03
+    assert (age < 0.5).all()                     # sampled values at most a poll or two old
+    m.log_source.setCurrentIndex(m.log_source.findData("direct"))
+    assert "lockin: read directly" in m.log_source_info.text()

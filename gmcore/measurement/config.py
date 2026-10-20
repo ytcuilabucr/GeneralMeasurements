@@ -9,6 +9,11 @@ Measurement Editor). Pure data, no Qt, no instruments.
   number of points or a step size, spaced linearly or logarithmically.
 - **Log channels**: the readings recorded at every point (field keys such as
   "Keithley 2400 - 1.i").
+- **Readings from** (`log_source`): whether the measurement reads a logged
+  instrument itself ("direct") or samples the Instrument Server's register,
+  the panels' latest polls ("register"; the panels alone read the hardware).
+  "auto" samples the register for an instrument whose panel polls at another
+  interval than the Timer's step (channels.log_sources).
 
 Saved as TOML (`to_toml` / `from_toml`), so a measurement can be read and
 edited by hand; the run's data file stores the same text.
@@ -30,6 +35,10 @@ STEP_TYPES = {"points": "Number of points", "step": "Step size"}
 INTERPOLATIONS = {"linear": "Linear", "log": "Logarithmic"}
 AFTER = {"hold": "Leave at the last values",
          "safe": "Safe state for every instrument used"}
+LOG_SOURCES = {"auto": "Auto: the server's register when the Timer's step differs "
+                       "from the server's interval",
+               "direct": "Direct: the measurement reads the instruments",
+               "register": "Server register: sample the panels' latest readings"}
 
 
 @dataclass
@@ -108,6 +117,7 @@ class MeasurementConfig:
     log: list[str] = field(default_factory=list)
     after: Literal["hold", "safe"] = "hold"
     data_dir: str = "Data"
+    log_source: Literal["auto", "direct", "register"] = "auto"
 
     def n_points(self) -> int:
         n = 1
@@ -126,7 +136,8 @@ class MeasurementConfig:
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> MeasurementConfig:
         d = dict(d)
-        unknown = set(d) - {"name", "comment", "step", "log", "after", "data_dir"}
+        unknown = set(d) - {"name", "comment", "step", "log", "after", "data_dir",
+                            "log_source"}
         if unknown:
             raise ValueError(f"unknown measurement keys: {', '.join(sorted(unknown))}")
         steps = []
@@ -137,6 +148,9 @@ class MeasurementConfig:
         cfg = cls(step=steps, **d)
         if cfg.after not in AFTER:
             raise ValueError(f"after = {cfg.after!r}: one of {', '.join(AFTER)}")
+        if cfg.log_source not in LOG_SOURCES:
+            raise ValueError(f"log_source = {cfg.log_source!r}: one of "
+                             f"{', '.join(LOG_SOURCES)}")
         for sc in cfg.step:
             for it in sc.items:
                 for key, allowed in (("range_type", RANGE_TYPES), ("step_type", STEP_TYPES),
@@ -150,7 +164,7 @@ class MeasurementConfig:
         doc = tomlkit.document()
         doc.add(tomlkit.comment("General Measurement: a measurement (step sequence: the "
                                 "first channel is the inner loop)"))
-        for k in ("name", "comment", "after", "data_dir"):
+        for k in ("name", "comment", "after", "data_dir", "log_source"):
             doc[k] = getattr(self, k)
         doc["log"] = list(self.log)
         steps = tomlkit.aot()

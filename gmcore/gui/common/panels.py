@@ -389,6 +389,13 @@ class Panel(QtWidgets.QWidget, PanelCommonForm):
         self._show_read_time()
         self._got(data)
 
+    def poll_interval_s(self) -> float | None:
+        """How often this panel reads the instrument (s): its interval while Live
+        is on and it is connected, None otherwise (it isn't polling)."""
+        if self.dev is None or not self.live.isChecked():
+            return None
+        return float(self.interval.value())
+
     def read_time_s(self) -> float | None:
         """The average of the last reads (None before the first)."""
         return sum(self.read_times) / len(self.read_times) if self.read_times else None

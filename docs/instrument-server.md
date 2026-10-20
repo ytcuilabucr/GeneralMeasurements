@@ -103,6 +103,22 @@ starts with the config last opened or saved. With it off, or when that file is
 gone, it starts with `Instrument config/lab.toml`. A file named on the command
 line always wins.
 
+**Process → Priority** and **CPU cores…** set how the program, and with it
+every measurement, runs on this computer (`gmcore/process.py`). They are
+applied when the server starts, however it is started (PyCharm,
+`python instrumentserver.py`, `gm server`), and at once when changed. The log
+shows the outcome, e.g. `process: priority High, cores 2, 3 (of 0-7)`.
+- **Priority:** Normal, Above normal or **High** (the default). High lets the
+  measurement win over other programs, such as antivirus scans and Windows
+  Update. Realtime is not offered: it can starve the mouse, the keyboard and
+  the USB/VISA drivers.
+- **CPU cores:** one box per logical processor; all ticked (the default) lets
+  Windows decide. The cores are not reserved, as other programs still run on
+  them, so choose at least two; with one, the window, the instruments and the
+  measurement share it and stalls get more likely.
+
+Priority can only be set on Windows; elsewhere the menu entry is disabled.
+
 ## App settings file: `Instrument config/misc.toml`
 
 The app's own settings are kept in one readable file, written whenever one
@@ -118,6 +134,10 @@ open_last = true
 
 [quick_view]
 hidden = ["Keithley 2400 - 1.i"]     # readings hidden in the Quick view
+
+[process]
+priority = "high"                    # normal / above_normal / high
+cores = [2, 3]                       # logical processors; empty = all
 ```
 
 It can be edited by hand while the app is closed, and its comments are kept.

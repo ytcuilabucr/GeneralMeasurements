@@ -23,6 +23,7 @@ class Axis:
     points: tuple[float, ...]
     settle_s: float = 0.0
     snake: bool = False         # reverse direction on alternate passes
+    stage: int = 0              # set after the moved axes of lower stages and their settle
 
     def __post_init__(self):
         if len(self.points) == 0:

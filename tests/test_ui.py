@@ -88,8 +88,9 @@ def test_general_measurement_lists_the_servers_instruments(app):
         m = s.measurement
         names = [m.instruments.topLevelItem(i).text(0)
                  for i in range(m.instruments.topLevelItemCount())]
-        assert names == [r.name for r in s.rows]
+        assert names == [r.name for r in s.rows] + ["Timer"]           # the built-in Timer last
         assert m.instruments.topLevelItem(0).text(1) == "not connected"   # none connected
+        assert m.log_source.currentData() == "auto"
         assert "empty" in m.estimate.text() and not m.btn_pause.isEnabled()
     finally:
         s._dirty = False

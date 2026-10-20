@@ -7,7 +7,11 @@ Editor (docs/general-measurement.md).
     Log channels (middle)     the readings recorded at every point
     Step channel (right)      the selected channel's step items and options
     Measurement (bottom)      name, data folder, comment, after-run action,
-                              Check / Start / Pause / Stop, and a live plot
+                              where readings come from (direct or the server's
+                              register), Check / Start / Pause / Stop, a live plot
+
+The Timer (gmcore/measurement/timer.py) is listed with the instruments: step it
+in the inner loop for a time trace at exact intervals.
 
 It runs in the server's program on the server's sessions (`server.devices`,
 single owner) and its worker loop. The measurement itself is
@@ -27,8 +31,10 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from ...api import run_scan
 from ...engine import Controller
 from ...engine.events import Event, Note, RunStart, RunStop
-from ...measurement import (AFTER, INTERPOLATIONS, RANGE_TYPES, STEP_TYPES, Channel,
-                            MeasurementConfig, StepChannel, StepItem, build, catalog)
+from ...measurement import (AFTER, INTERPOLATIONS, LOG_SOURCES, RANGE_TYPES, STEP_TYPES,
+                            Channel, MeasurementConfig, StepChannel, StepItem, build, catalog,
+                            estimate_s, timer_step)
+from ...measurement import timer as tm
 from ...plans import PlanError
 from ...sinks.liveplot import LivePlotSink, PlotBuffer
 from ...units import fmt
@@ -99,6 +105,10 @@ class GeneralMeasurementWindow(QtWidgets.QMainWindow, GeneralMeasurementForm):
                              (self.interpolation, INTERPOLATIONS), (self.after, AFTER)):
             for key, label in table.items():
                 combo.addItem(label, key)
+        for key, label in LOG_SOURCES.items():          # "Auto: …": the part before ":"
+            self.log_source.addItem(label.split(":")[0], key)
+            self.log_source.setItemData(self.log_source.count() - 1, label,
+                                        QtCore.Qt.ItemDataRole.ToolTipRole)
         self.data_dir.setText(self.cfg.data_dir)
         self.split_h.setSizes([300, 520, 360])
         self.split_v.setSizes([520, 300])
@@ -139,6 +149,8 @@ class GeneralMeasurementWindow(QtWidgets.QMainWindow, GeneralMeasurementForm):
         self.data_dir.textEdited.connect(lambda t: self._meta_changed(data_dir=t))
         self.after.currentIndexChanged.connect(
             lambda _i: self._meta_changed(after=self.after.currentData()))
+        self.log_source.currentIndexChanged.connect(
+            lambda _i: self._meta_changed(log_source=self.log_source.currentData()))
         self.btn_browse.clicked.connect(self._browse)
         self.btn_dry_run.clicked.connect(self.check)
         self.actionDryRun.triggered.connect(self.check)
@@ -181,20 +193,32 @@ class GeneralMeasurementWindow(QtWidgets.QMainWindow, GeneralMeasurementForm):
                 top.setText(1, "not connected")
                 top.setForeground(0, self.palette().placeholderText())
                 continue
-            for kind, title, role in (("step", "Set", "sweep"), ("log", "Read", "read")):
-                these = [c for c in mine if c.kind == kind]
-                if not these:
-                    continue
-                group = QtWidgets.QTreeWidgetItem(top, [title, ""])
-                group.setIcon(0, icons.icon(role))
-                for c in these:
-                    it = QtWidgets.QTreeWidgetItem(group, [_short(c.label, r.name), c.unit])
-                    it.setData(0, ID, c.id)
-                    it.setToolTip(0, self._channel_tip(c))
+            self._add_channels(top, r.name, mine)
+        if tm.NAME not in self.server.devices:         # the built-in Timer, always there
+            top = QtWidgets.QTreeWidgetItem([tm.NAME, "built in"])
+            top.setIcon(0, icons.icon("timer"))
+            top.setToolTip(0, "Step it in the inner loop (from 0) for a time trace at exact "
+                              "intervals; log its clock for the real time of each point")
+            self.instruments.addTopLevelItem(top)
+            self._add_channels(top, tm.NAME,
+                               [c for c in self.channels.values() if c.instrument == tm.NAME])
         self.instruments.expandAll()
         self.instruments.resizeColumnToContents(0)
         self._fill_lists()
         self._update_estimate()
+
+    def _add_channels(self, top: QtWidgets.QTreeWidgetItem, name: str,
+                      mine: list[Channel]) -> None:
+        for kind, title, role in (("step", "Set", "sweep"), ("log", "Read", "read")):
+            these = [c for c in mine if c.kind == kind]
+            if not these:
+                continue
+            group = QtWidgets.QTreeWidgetItem(top, [title, ""])
+            group.setIcon(0, icons.icon(role))
+            for c in these:
+                it = QtWidgets.QTreeWidgetItem(group, [_short(c.label, name), c.unit])
+                it.setData(0, ID, c.id)
+                it.setToolTip(0, self._channel_tip(c))
 
     def _channel_tip(self, c: Channel) -> str:
         lo, hi = c.limits
@@ -464,6 +488,8 @@ class GeneralMeasurementWindow(QtWidgets.QMainWindow, GeneralMeasurementForm):
             setattr(self.cfg, k, v)
         self._dirty = True
         self._update_title()
+        if "log_source" in kw:                    # where readings come from, and the time
+            self._update_estimate()
 
     def _changed(self) -> None:
         self._dirty = True
@@ -479,6 +505,7 @@ class GeneralMeasurementWindow(QtWidgets.QMainWindow, GeneralMeasurementForm):
             self.comment.setText(self.cfg.comment)
             self.data_dir.setText(self.cfg.data_dir)
             self.after.setCurrentIndex(self.after.findData(self.cfg.after))
+            self.log_source.setCurrentIndex(self.log_source.findData(self.cfg.log_source))
         finally:
             self._loading = False
         self._fill_lists()
@@ -494,16 +521,40 @@ class GeneralMeasurementWindow(QtWidgets.QMainWindow, GeneralMeasurementForm):
         if text:
             self.statusbar.showMessage(text, 8000)
 
+    def intervals(self) -> dict[str, float | None]:
+        """Each instrument's panel polling interval (s), None while not polling."""
+        return {r.name: r.panel.poll_interval_s() for r in self.server.rows
+                if r.panel is not None}
+
     def plan(self):
         """The Scan and the runner's devices for the measurement now (PlanError)."""
-        return build(self.cfg, self.server.devices)
+        return build(self.cfg, self.server.devices, getattr(self.server, "register", None),
+                     self.intervals())
 
-    def read_time(self) -> float:
-        """The slowest logged instrument's read, from its panel (reads run together)."""
+    def read_time(self, sources: dict[str, str] | None = None) -> float:
+        """The slowest directly read instrument's read, from its panel (reads run
+        together); sampling the register costs nothing."""
         names = {self.channels[k].instrument for k in self.cfg.log if k in self.channels}
+        names -= {n for n, how in (sources or {}).items() if how == "register"}
         times = [r.panel.read_time_s() for r in self.server.rows
                  if r.name in names and r.panel is not None]
         return max((t for t in times if t is not None), default=0.0)
+
+    def _sources_text(self, scan) -> str:
+        """Where each logged instrument's readings come from, in words."""
+        sources = scan.metadata.get("log_sources", {})
+        polls = scan.metadata.get("server_intervals_s", {})
+        parts = []
+        for inst, how in sources.items():
+            if how == "register":
+                parts.append(f"{inst}: server register (panel reads every "
+                             f"{fmt(polls.get(inst), 's')})")
+            else:
+                parts.append(f"{inst}: read directly")
+        return "; ".join(parts)
+
+    def _estimate(self, scan) -> float:
+        return estimate_s(scan, read_s=self.read_time(scan.metadata.get("log_sources")))
 
     def _update_estimate(self, full: bool = False) -> tuple[bool, str]:
         """Points and time, or why the measurement can't run; shown next to Start."""
@@ -511,13 +562,28 @@ class GeneralMeasurementWindow(QtWidgets.QMainWindow, GeneralMeasurementForm):
             scan, _ = self.plan()
         except (PlanError, ValueError) as e:
             self.estimate.setText(f"<span style='color:{_AMBER}'>{e}</span>")
+            self.log_source_info.setText("")
             return False, str(e)
+        self.log_source_info.setText(self._sources_text(scan))
         n = scan.n_points
         text = f"{n} point{'s' if n != 1 else ''}"
         if full or n <= ESTIMATE_MAX_POINTS:
-            text += f", about {duration(scan.estimate_time(read_s=self.read_time()))}"
-        self.estimate.setText(text)
-        return True, text
+            text += f", about {duration(self._estimate(scan))}"
+        late = self._late_warning(scan)
+        self.estimate.setText(text + (f" <span style='color:{_AMBER}'>— {late}</span>"
+                                      if late else ""))
+        return True, text + (f" — {late}" if late else "")
+
+    def _late_warning(self, scan) -> str:
+        """The Timer's step against the slowest direct read: points that can't
+        keep up fall behind the grid."""
+        dt = timer_step(self.cfg)
+        read_s = self.read_time(scan.metadata.get("log_sources"))
+        if dt is None or read_s < dt:
+            return ""
+        return (f"reads take {fmt(read_s, 's')}, not less than the Timer step "
+                f"{fmt(dt, 's')}: points will fall behind (sample the server register, "
+                "or lengthen the step)")
 
     # -- file ------------------------------------------------------------------------------
     def new(self) -> None:
@@ -607,12 +673,14 @@ class GeneralMeasurementWindow(QtWidgets.QMainWindow, GeneralMeasurementForm):
         path = data_path(self.cfg.data_dir, self.cfg.name)
         stepped = "\n".join(f"  {self.label(sc.channel)}: {self._summary(sc)[0]}"
                             for sc in self.cfg.step)
+        readings = self._sources_text(scan)
         r = QtWidgets.QMessageBox.question(
             self, "Start measurement",
             f"Start “{self.cfg.name}”: {scan.n_points} points, about "
-            f"{duration(scan.estimate_time(read_s=self.read_time()))}.\n\n"
-            f"These will be set:\n{stepped}\n\nAfter the run: {AFTER[self.cfg.after]}.\n"
-            f"Data: {path}")
+            f"{duration(self._estimate(scan))}.\n\n"
+            f"These will be set:\n{stepped}\n\n"
+            + (f"Readings: {readings}.\n" if readings else "")
+            + f"After the run: {AFTER[self.cfg.after]}.\nData: {path}")
         if r != QtWidgets.QMessageBox.StandardButton.Yes:
             return False
         self.controller = Controller()
@@ -646,7 +714,8 @@ class GeneralMeasurementWindow(QtWidgets.QMainWindow, GeneralMeasurementForm):
 
     def _set_running(self, on: bool) -> None:
         for w in (self.instruments_box, self.lists, self.channel_box, self.meas_name,
-                  self.comment, self.data_dir, self.btn_browse, self.after, self.btn_run,
+                  self.comment, self.data_dir, self.btn_browse, self.after,
+                  self.log_source, self.btn_run,
                   self.btn_dry_run):
             w.setEnabled(not on)
         for a in (self.actionNew, self.actionOpenSequence, self.actionRun, self.actionDryRun):

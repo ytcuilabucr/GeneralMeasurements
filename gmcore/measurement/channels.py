@@ -19,6 +19,12 @@ and how a MeasurementConfig becomes a Scan the runner executes.
   data file, and with "Safe state" after the run its safe_state() runs, in the
   station's shutdown order. Nothing else is done before the run: no output is
   turned on.
+- RegisterTarget (register.py): a logged instrument the measurement samples
+  from the server's register instead of reading it (log_sources()).
+
+The Timer (timer.py) is always offered: step channel "Timer.timer", log
+channel "Timer.clock". build() gives every run a fresh one, set after the other
+channels (axis stage 1).
 """
 
 from __future__ import annotations
@@ -33,7 +39,9 @@ from ..devices import definitions as defs
 from ..devices.protocols import FieldInfo
 from ..plans import PlanError, Scan
 from ..plans.axes import Axis
+from . import timer as tm
 from .config import MeasurementConfig
+from .register import Register, RegisterTarget
 
 NUMERIC = ("float", "int")
 
@@ -95,13 +103,82 @@ def log_channels(name: str, dev: Any) -> list[Channel]:
             for key, info in _describe(dev).items() if not info.shape]
 
 
+TIMER_CHANNELS = (
+    Channel(tm.STEP_ID, tm.NAME, "wait until", "s", "step", (0.0, None)),
+    Channel(tm.CLOCK_ID, tm.NAME, "Timer clock", "s", "log"))
+
+
 def catalog(devices: Mapping[str, Any]) -> dict[str, Channel]:
-    """Every step and log channel of the connected instruments, by id."""
+    """Every step and log channel of the connected instruments, by id, and the
+    Timer's (unless an instrument is itself named "Timer")."""
     out: dict[str, Channel] = {}
     for name, dev in devices.items():
         for ch in step_channels(name, dev) + log_channels(name, dev):
             out.setdefault(ch.id, ch)
+    if tm.NAME not in devices:
+        for ch in TIMER_CHANNELS:
+            out[ch.id] = ch
     return out
+
+
+def timer_step(cfg: MeasurementConfig) -> float | None:
+    """The Timer's step (s): the smallest gap between its values, None when the
+    Timer is not stepped as a loop."""
+    for sc in cfg.step:
+        if sc.channel == tm.STEP_ID and not sc.single:
+            v = sorted(set(sc.values()))
+            gaps = [b - a for a, b in zip(v, v[1:]) if b > a]
+            return min(gaps) if gaps else None
+    return None
+
+
+def log_sources(cfg: MeasurementConfig, channels: Mapping[str, Channel],
+                intervals: Mapping[str, float | None],
+                tolerance: float = 0.01) -> dict[str, str]:
+    """"direct" or "register" for every logged instrument (the Timer is always
+    read directly). `channels`: the catalog; `intervals`: each instrument's panel
+    polling interval in s, None when its panel isn't polling (Live off).
+
+    auto: "register" when the Timer is stepped and the instrument's panel polls
+    at another interval (relative `tolerance`): the panel alone reads the
+    hardware and the measurement samples its latest values. "direct" otherwise,
+    and always for an instrument whose panel isn't polling."""
+    dt = timer_step(cfg)
+    out: dict[str, str] = {}
+    for key in cfg.log:
+        ch = channels.get(key)
+        if ch is None or ch.instrument == tm.NAME or ch.instrument in out:
+            continue
+        if cfg.log_source != "auto":
+            out[ch.instrument] = cfg.log_source
+            continue
+        iv = intervals.get(ch.instrument)
+        mismatch = dt is not None and iv is not None and abs(iv - dt) > tolerance * dt
+        out[ch.instrument] = "register" if mismatch else "direct"
+    return out
+
+
+def estimate_s(scan: Scan, read_s: float = 0.0) -> float:
+    """The run's time in s: each changed channel's wait, each point's read, and
+    the Timer's waits (a pass of the Timer lasts its last value at least)."""
+    t, prev = 0.0, {}
+    origin: float | None = None
+    last: float | None = None
+    for _, _, sp in scan.points():
+        moved = [a for a in scan.axes if prev.get(a.device) != sp[a.device]]
+        for stage in sorted({a.stage for a in moved}):
+            these = [a for a in moved if a.stage == stage]
+            if any(a.device == tm.STEP_ID for a in these):
+                v = sp[tm.STEP_ID]
+                if origin is None or v == 0 or (last is not None and v < last):
+                    origin = t - v
+                else:
+                    t = max(t, origin + v)
+                last = v
+            t += max(a.settle_s for a in these)
+        t += read_s
+        prev = sp
+    return t
 
 
 def _setter(ch: Channel, dev: Any) -> Callable[[float], Any]:
@@ -170,11 +247,25 @@ def log_key(instrument: str) -> str:
     return f"{instrument} (log)"
 
 
-def build(cfg: MeasurementConfig, devices: Mapping[str, Any]) -> tuple[Scan, dict[str, Any]]:
+def build(cfg: MeasurementConfig, devices: Mapping[str, Any],
+          register: Register | None = None,
+          intervals: Mapping[str, float | None] | None = None,
+          ) -> tuple[Scan, dict[str, Any]]:
     """The Scan and the runner's devices for `cfg` on the connected `devices`.
-    Raises PlanError for an unknown or disconnected channel, a channel stepped
-    twice, a bad step item, or nothing to step."""
+
+    `register` and `intervals` (each panel's polling interval, None when not
+    polling) decide which logged instruments are sampled from the server's
+    register (log_sources); the decision is in the scan's metadata
+    ("log_sources"). Raises PlanError for an unknown or disconnected channel, a
+    channel stepped twice, a bad step item, nothing to step, or an instrument
+    to sample whose panel isn't polling."""
+    if tm.NAME in devices and not isinstance(devices[tm.NAME], tm.Timer):
+        raise PlanError(f"an instrument is named {tm.NAME!r}, the built-in timer's name: "
+                        "rename it in the Instrument Server")
+    devices = {**devices, tm.NAME: tm.Timer()}           # a fresh timer for every run
     cat = catalog(devices)
+    for ch in TIMER_CHANNELS:
+        cat[ch.id] = ch
     if not cfg.step:
         raise PlanError("the step sequence is empty: add a channel (one value is enough "
                         "for a single point)")
@@ -186,13 +277,26 @@ def build(cfg: MeasurementConfig, devices: Mapping[str, Any]) -> tuple[Scan, dic
     for key in cfg.log:
         if key not in cat or cat[key].kind != "log":
             raise PlanError(f"log channel {key!r}: not a reading of a connected instrument")
+    intervals = dict(intervals or {})
+    sources = log_sources(cfg, cat, intervals)
+    for inst, how in sources.items():
+        if how != "register":
+            continue
+        if register is None:
+            raise PlanError(f"{inst}: sampling the server's register needs the Instrument "
+                            "Server")
+        if intervals.get(inst) is None:
+            raise PlanError(f"{inst}: its panel isn't polling (Live is off), so the "
+                            "register has nothing to sample: turn Live on, or read it "
+                            "directly")
 
     def axis(sc) -> Axis:
         try:
             values = sc.values()
         except ValueError as e:
             raise PlanError(f"{sc.channel}: {e}") from None
-        return Axis(sc.channel, values, sc.settle_s, sc.snake)
+        return Axis(sc.channel, values, sc.settle_s, sc.snake,
+                    stage=1 if sc.channel == tm.STEP_ID else 0)
     # set-once channels first (outermost), then the loops, outermost first
     single = [axis(sc) for sc in cfg.step if sc.single]
     loops = [axis(sc) for sc in reversed(cfg.step) if not sc.single]
@@ -208,7 +312,13 @@ def build(cfg: MeasurementConfig, devices: Mapping[str, Any]) -> tuple[Scan, dic
         by_inst.setdefault(cat[key].instrument, []).append(key)
     readables = []
     for inst, keys in by_inst.items():
-        run_devices[log_key(inst)] = LogTarget(inst, devices[inst], keys)
+        dev = devices[inst]
+        if sources.get(inst) == "register":
+            assert register is not None
+            run_devices[log_key(inst)] = RegisterTarget(inst, register, keys,
+                                                        _describe(dev))
+        else:
+            run_devices[log_key(inst)] = LogTarget(inst, dev, keys)
         readables.append(log_key(inst))
         used.append(inst)
     for inst in dict.fromkeys(used):
@@ -216,6 +326,8 @@ def build(cfg: MeasurementConfig, devices: Mapping[str, Any]) -> tuple[Scan, dic
 
     scan = Scan(tuple(single + loops), tuple(readables),
                 metadata={"name": cfg.name, "comment": cfg.comment,
-                          "step_order": [sc.channel for sc in cfg.step]})
+                          "step_order": [sc.channel for sc in cfg.step],
+                          "log_sources": sources,
+                          "server_intervals_s": {i: intervals.get(i) for i in sources}})
     scan.validate(run_devices)
     return scan, run_devices

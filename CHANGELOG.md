@@ -57,6 +57,21 @@ read-only queries to the Lake Shore 335, 625, Giga-tronics 2420B and SR850.
   - Control only: readings are the settings (software level), read back from
     the controller on connect; safe state = amplitude 0. Not yet run on the
     hardware.
+- **General Measurement: Timer and server register** (`docs/general-measurement.md`):
+  - **Timer**, after Labber's Timer driver: the step channel `Timer.timer` waits
+    to absolute times from the pass's reset, so slow reads don't make the
+    points drift. `Timer.clock` logs the real time. The Timer is set after the
+    outer channels and their wait (new axis `stage`). The estimate counts its
+    waits and warns when reads are slower than the step.
+  - **Readings from** Auto / Direct / Server register: a logged instrument is
+    either read by the measurement or sampled from the server's register, the
+    panels' latest polls, with `<instrument>.sample_age`. Auto samples when the
+    Timer's step differs from the panel's polling interval.
+- **Process priority and CPU cores** (`gmcore/process.py`; server's
+  Miscellaneous → Process): Normal / Above normal / High (default High; no
+  Realtime) and a choice of cores, kept in `misc.toml` `[process]` and applied
+  at every start of the server, however it is started (PyCharm,
+  `instrumentserver.py`, `gm server`), and at once when changed.
 - **General Measurement**, after Labber's Measurement Editor
   (`docs/general-measurement.md`):
   - the server's connected instruments with their Set channels (writable

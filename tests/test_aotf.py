@@ -215,7 +215,8 @@ max_power = 10.0
         load_station(p)
     d = _aotf()
     assert set(d.describe()) == {"AOTF.wavelength", "AOTF.power", "AOTF.rf_frequency"}
-    steps = {c.id: c for c in catalog({"AOTF": d}).values() if c.kind == "step"}
+    steps = {c.id: c for c in catalog({"AOTF": d}).values()
+             if c.kind == "step" and c.instrument == "AOTF"}       # not the Timer's
     assert set(steps) == {"AOTF.wavelength", "AOTF.power"}
     assert steps["AOTF.wavelength"].limits == d.range_nm
     assert steps["AOTF.power"].limits == (0.0, 100.0)

@@ -27,7 +27,9 @@ from tomlkit.exceptions import TOMLKitError
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from ...config.schema import DRIVER_DEFAULTS, DRIVERS, StationConfig, check_name
+from ... import process
 from ...engine.runner import safe_shutdown
+from ...measurement.register import Register
 from ..common.panels import Panel, detail_actions
 from ..common.registry import panel_for
 from ..common import appsettings, icons, theme
@@ -165,6 +167,8 @@ class InstrumentServer(QtWidgets.QMainWindow, ServerForm):
         self.settings = settings if settings is not None else appsettings.misc()
         self.worker = AsyncWorker()
         self.devices: dict[str, object] = {}
+        # every panel's latest poll, for measurements that sample instead of reading
+        self.register = Register()
         self.rows: list[InstrumentRow] = []
         self.path: Path | None = None
         self.doc: tomlkit.TOMLDocument = tomlkit.document()
@@ -196,6 +200,7 @@ class InstrumentServer(QtWidgets.QMainWindow, ServerForm):
         self.actionOpenLast.setChecked(open_last(self.settings))
         self.actionOpenLast.toggled.connect(
             lambda on: self.settings.setValue(OPEN_LAST_KEY, on))
+        self._add_process_menu()
         if getattr(self.settings, "error", ""):
             self.log("warn", self.settings.error)
 
@@ -204,6 +209,118 @@ class InstrumentServer(QtWidgets.QMainWindow, ServerForm):
         else:
             self._build_table()
             self._update_title()
+
+    # -- process priority and cores (Miscellaneous menu; gmcore/process.py) -------------
+    def _add_process_menu(self) -> None:
+        self.menuMiscellaneous.addSection("Process")
+        self.menuPriority = self.menuMiscellaneous.addMenu("Priority")
+        self.menuPriority.setObjectName("menuPriority")
+        self.menuPriority.setToolTip("How the program competes with other programs for the "
+                                     "CPU. Realtime is not offered.")
+        self.menuPriority.setToolTipsVisible(True)
+        group = QtGui.QActionGroup(self.menuPriority)
+        self.priority_actions: dict[str, QtGui.QAction] = {}
+        for prio in process.PRIORITIES:
+            act = self.menuPriority.addAction(process.LABELS[prio])
+            act.setObjectName(f"actionPriority_{prio}")
+            act.setCheckable(True)
+            act.setData(prio)
+            group.addAction(act)
+            self.priority_actions[prio] = act
+        group.triggered.connect(lambda act: self.set_process(priority=act.data()))
+        self.menuPriority.setEnabled(process.can_set_priority())
+        self.actionCores = self.menuMiscellaneous.addAction("CPU cores…")
+        self.actionCores.setObjectName("actionCores")
+        self.actionCores.triggered.connect(self.choose_cores)
+        self.actionCores.setEnabled(process.can_set_cores())
+        self._show_process()
+
+    def _show_process(self) -> None:
+        prio, chosen = process.from_settings(self.settings)
+        self.priority_actions[prio].setChecked(True)
+        self.actionCores.setText(f"CPU cores: {', '.join(map(str, chosen))}…" if chosen
+                                 else "CPU cores: all…")
+
+    def apply_process(self) -> bool:
+        """Set this process's priority and cores from the settings; logs the outcome."""
+        prio, chosen = process.from_settings(self.settings)
+        try:
+            text = process.apply(prio, chosen)
+        except (OSError, ValueError) as e:
+            self.log("error", f"process: {e}")
+            return False
+        self.log("info", f"process: {text}")
+        return True
+
+    def set_process(self, priority: str | None = None,
+                    cores: list[int] | None = None) -> bool:
+        """Remember a new priority and/or cores (empty = all) and apply them now."""
+        if priority is not None:
+            self.settings.setValue(process.PRIORITY_KEY, priority)
+        if cores is not None:
+            self.settings.setValue(process.CORES_KEY, sorted(cores))
+        self._show_process()
+        return self.apply_process()
+
+    def cores_dialog(self) -> QtWidgets.QDialog:
+        """One box per logical processor, ticked as in the settings (all when none)."""
+        _prio, chosen = process.from_settings(self.settings)
+        every = process.all_cores()
+        dlg = QtWidgets.QDialog(self)
+        dlg.setObjectName("CoresDialog")
+        dlg.setWindowTitle("CPU cores")
+        lay = QtWidgets.QVBoxLayout(dlg)
+        note = QtWidgets.QLabel(
+            "Run the program, and with it every measurement, on these cores only. "
+            "Applied now and at every start.\n\nThe cores aren't reserved: other programs "
+            "still use them. Choose at least 2; with all ticked, Windows decides.")
+        note.setWordWrap(True)
+        lay.addWidget(note)
+        grid = QtWidgets.QGridLayout()
+        boxes: list[QtWidgets.QCheckBox] = []
+        for i, core in enumerate(every):
+            box = QtWidgets.QCheckBox(f"Core {core}")
+            box.setChecked(not chosen or core in chosen)
+            box.setProperty("core", core)
+            grid.addWidget(box, i // 4, i % 4)
+            boxes.append(box)
+        lay.addLayout(grid)
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok
+                                             | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        ok = buttons.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
+        all_btn = buttons.addButton("All cores",
+                                    QtWidgets.QDialogButtonBox.ButtonRole.ResetRole)
+        all_btn.clicked.connect(lambda: [b.setChecked(True) for b in boxes])
+        warn = QtWidgets.QLabel()
+        warn.setStyleSheet("color: #b9770e")
+        lay.addWidget(warn)
+
+        def update() -> None:
+            n = sum(b.isChecked() for b in boxes)
+            ok.setEnabled(n > 0)
+            warn.setText("Tick at least one core." if n == 0 else
+                         "One core: the window, the instruments and the measurement share "
+                         "it, so stalls get more likely." if n == 1 else "")
+        for b in boxes:
+            b.toggled.connect(update)
+        update()
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        lay.addWidget(buttons)
+        dlg.setProperty("boxes", boxes)
+        return dlg
+
+    @staticmethod
+    def dialog_cores(dlg: QtWidgets.QDialog) -> list[int]:
+        """The ticked cores of `cores_dialog`; empty when all are ticked."""
+        boxes = dlg.property("boxes")
+        chosen = [b.property("core") for b in boxes if b.isChecked()]
+        return [] if len(chosen) == len(boxes) else chosen
+
+    def choose_cores(self) -> None:
+        dlg = self.cores_dialog()
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            self.set_process(cores=self.dialog_cores(dlg))
 
     # -- log -----------------------------------------------------------------------------
     def log(self, level: str, text: str) -> None:
@@ -465,12 +582,15 @@ class InstrumentServer(QtWidgets.QMainWindow, ServerForm):
             r.panel = panel_for(r.driver)(r.name, r.cfg(), self)
             r.panel.status_changed.connect(lambda _n, state, r=r: self._on_status(r, state))
             r.panel.reading.connect(self.quick.update)
+            r.panel.reading.connect(self.register.update)
             r.panel.connected.connect(lambda _n: self._refresh_quick())   # (re)attached
             r.panel.connected.connect(lambda _n: self._connect_pending())
         return r.panel
 
     def _on_status(self, r: InstrumentRow, state: str) -> None:
         r.state = state
+        if state != "connected":
+            self.register.drop(r.name)          # its values are no longer current
         self._update_row(r)
         if state in ("connected", "disconnected"):
             self._refresh_quick()
@@ -672,5 +792,6 @@ def main(path: str | Path | None = None) -> int:  # pragma: no cover
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
     app.setApplicationName("GeneralMeasurements")
     server = InstrumentServer(path if path is not None else start_config())
+    server.apply_process()          # priority and cores from misc.toml, however started
     server.show()
     return app.exec()

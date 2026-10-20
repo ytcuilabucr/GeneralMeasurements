@@ -73,9 +73,10 @@ async def _stepped_body(scan: Scan, devices, emit, note, controller: Controller,
     async def acquire(sp) -> dict:
         nonlocal prev
         moved = [a for a in scan.axes if prev.get(a.device) != sp[a.device]]
-        if moved:
-            await asyncio.gather(*(devices[a.device].set(sp[a.device]) for a in moved))
-            settle = max(a.settle_s for a in moved)
+        for stage in sorted({a.stage for a in moved}):   # lower stages first
+            these = [a for a in moved if a.stage == stage]
+            await asyncio.gather(*(devices[a.device].set(sp[a.device]) for a in these))
+            settle = max(a.settle_s for a in these)
             if settle:
                 await asyncio.sleep(settle)
         prev = sp
