@@ -51,6 +51,11 @@ def _kernel32():
     return k
 
 
+def _win_error() -> OSError:
+    """The last Windows error (ctypes' Windows-only helpers, typed for any platform)."""
+    return getattr(ctypes, "WinError")(getattr(ctypes, "get_last_error")())
+
+
 def _bits(mask: int) -> list[int]:
     return [i for i in range(mask.bit_length()) if mask >> i & 1]
 
@@ -60,7 +65,7 @@ def _masks(k) -> tuple[int, int]:
     proc, system = ctypes.c_size_t(), ctypes.c_size_t()
     if not k.GetProcessAffinityMask(k.GetCurrentProcess(), ctypes.byref(proc),
                                     ctypes.byref(system)):
-        raise ctypes.WinError(ctypes.get_last_error())
+        raise _win_error()
     return proc.value, system.value
 
 
@@ -118,7 +123,7 @@ def set_priority(prio: str) -> None:
     if k is None:
         raise OSError("process priority can only be set on Windows")
     if not k.SetPriorityClass(k.GetCurrentProcess(), _CLASSES[prio]):
-        raise ctypes.WinError(ctypes.get_last_error())
+        raise _win_error()
 
 
 def set_cores(chosen: Iterable[int]) -> None:
@@ -127,7 +132,7 @@ def set_cores(chosen: Iterable[int]) -> None:
     k = _kernel32()
     if k is not None:
         if not k.SetProcessAffinityMask(k.GetCurrentProcess(), sum(1 << c for c in chosen)):
-            raise ctypes.WinError(ctypes.get_last_error())
+            raise _win_error()
     elif hasattr(os, "sched_setaffinity"):
         getattr(os, "sched_setaffinity")(0, chosen)
     else:
