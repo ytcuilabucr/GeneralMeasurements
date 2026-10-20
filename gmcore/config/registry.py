@@ -67,7 +67,7 @@ def check_settings(cfg: StationConfig) -> None:
                 raise ValueError(f"{name}: {e}") from None
 
 
-def _unopened(d: DeviceCfg):
+def _unopened(d):                        # a device with a resource
     if isinstance(d, AotfCfg):
         return AotfLibraryTransport()
     if isinstance(d, (YslAotfCfg, YslScPro8Cfg)):
@@ -100,7 +100,8 @@ def _make(name: str, d: DeviceCfg, t) -> object:
         cals = {m: read_calibration(p) for m, p in d.calibrations.items()}
         return AotfOctal(name, t, cals, d.mode, d.channel, d.max_power, d.settle_s)
     if isinstance(d, YslAotfCfg):
-        return YslAotf(name, t, d.calibration, d.max_power, d.settle_s)
+        return YslAotf(name, t, {str(k): v for k, v in d.calibration.items()}, d.max_power,
+                       d.settle_s)
     if isinstance(d, YslScPro8Cfg):
         return YslScPro8(name, t, d.max_power)
     raise ValueError(f"{name}: no builder for driver {d.driver!r}")

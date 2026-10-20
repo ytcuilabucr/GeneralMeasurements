@@ -2,7 +2,7 @@
 name = "GeneralMeasurements"
 version = "0.0.1"
 requires-python = ">=3.12"
-dependencies = ["numpy", "h5py", "pydantic>=2", "pyvisa", "pyvisa-py"]
+dependencies = ["numpy", "h5py", "pydantic>=2", "pyvisa", "pyvisa-py", "tomlkit"]
 
 [project.optional-dependencies]
 xarray = ["xarray"]

@@ -361,15 +361,15 @@ class GeneralMeasurementWindow(QtWidgets.QMainWindow):
         return f"{fmt(it.start, unit)} → {fmt(it.stop, unit)}, {n} points{how}"
 
     def _show_item(self) -> None:
-        it = self.current_item()
-        self.btn_item_remove.setEnabled(it is not None and len(self.current_channel().items) > 1)
+        it, ch = self.current_item(), self.current_channel()
+        self.btn_item_remove.setEnabled(it is not None and ch is not None and len(ch.items) > 1)
         for w in (self.range_type, self.item_start, self.item_stop, self.item_center,
                   self.item_span, self.step_type, self.n_points, self.item_step,
                   self.interpolation):
             w.setEnabled(it is not None)
-        if it is None:
+        if it is None or ch is None:
             return
-        c = self.channels.get(self.current_channel().channel)
+        c = self.channels.get(ch.channel)
         unit = c.unit if c else ""
         self._loading = True
         try:
@@ -427,6 +427,8 @@ class GeneralMeasurementWindow(QtWidgets.QMainWindow):
             self._show_item()
             return
         it = self.current_item()
+        if it is None:
+            return
         if field in ("start", "stop"):
             self._item_changed(**{field: v})
         elif field == "center":

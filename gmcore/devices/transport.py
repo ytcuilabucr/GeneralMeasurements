@@ -14,7 +14,7 @@ import re
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class DriverError(RuntimeError):
@@ -163,7 +163,7 @@ class _Server32Port:
 
     def __init__(self, instance: int, dll: str):
         try:
-            from msl.loadlib import Client64
+            from msl.loadlib import Client64  # pyright: ignore[reportMissingImports]
         except ImportError:
             raise DriverError("the AOTF needs msl-loadlib (pip install msl-loadlib) to use "
                               "the vendor's 32-bit AotfLibrary.dll") from None
@@ -287,7 +287,7 @@ class _VisaSerialPort:
         import pyvisa  # lazy: tests don't need VISA
         from pyvisa import constants
         try:
-            inst = pyvisa.ResourceManager().open_resource(resource)
+            inst: Any = pyvisa.ResourceManager().open_resource(resource)   # a SerialInstrument
         except pyvisa.errors.VisaIOError as e:
             raise DriverError(f"{resource}: {e}") from None
         inst.baud_rate, inst.data_bits = baud, 8

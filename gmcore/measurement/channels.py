@@ -73,7 +73,7 @@ def step_channels(name: str, dev: Any) -> list[Channel]:
             elif p.ramp is not None and main_pid is None:
                 main_pid = pid
     if not covered and callable(getattr(dev, "set", None)) and hasattr(dev, "limits"):
-        if main_pid is not None:
+        if main_pid is not None and defn is not None:
             p = defn.properties[main_pid]
             out.insert(0, Channel(f"{name}.{main_pid}", name,
                                   defs.text(p.label, dev) or main_pid,

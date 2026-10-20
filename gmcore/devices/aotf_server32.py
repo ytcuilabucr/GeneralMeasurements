@@ -17,7 +17,7 @@ time while AotfIsReadDataAvailable says there is more.
 import ctypes
 from ctypes import c_int, c_uint, c_void_p
 
-from msl.loadlib import Server32
+from msl.loadlib import Server32  # pyright: ignore[reportMissingImports]
 
 
 class AotfServer32(Server32):
