@@ -324,3 +324,23 @@ async def test_lockin_reference_settings_are_set_and_read_back():
     t.write = ignore
     with pytest.raises(DriverError, match=re.escape("the lock-in has 0.2 V")):
         await li.set_amplitude(1.0)
+
+
+async def test_sr850_numbers_the_reference_source_its_own_way():
+    """SR850 FMOD: 0 internal, 1 internal sweep, 2 external (SR830: 0 external,
+    1 internal). The SR830's numbering refused every SR850 frequency set."""
+    state = {"FREQ": "1000", "FMOD": "0", "HARM": "1"}
+
+    class Unit(FakeTransport):
+        async def write(self, cmd):
+            await super().write(cmd)
+            k, _, v = cmd.partition(" ")
+            state[k] = v
+    t = Unit(lambda c: state.get(c.rstrip("?"), "0"))
+    li = SR850("li", t)
+    assert await li.set_frequency(137.0) == 137.0 and "FREQ 137" in t.log
+    for fmod, what in (("1", "internal sweep"), ("2", "external")):
+        state["FMOD"] = fmod
+        with pytest.raises(DriverError, match=f"source is {what};"):
+            await li.set_frequency(10.0)
+    assert state["FREQ"] == "137"                      # nothing sent when refused

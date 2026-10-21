@@ -1,6 +1,8 @@
 """Stanford Research SR830 and SR850 lock-in amplifiers (Readable).
 
-Both share the command set used here (OUTP?/SNAP?/FREQ/SLVL/SENS/OFLT/PHAS).
+Both share the command set used here (OUTP?/SNAP?/FREQ/SLVL/SENS/OFLT/PHAS),
+except FMOD, the reference source: SR830 0 = external, 1 = internal; SR850
+0 = internal, 1 = internal sweep, 2 = external.
 From the SR830 and SR850 manuals (thinksrs.com): SENS 0 … 26 = 2 nV … 1 V
 full scale, OFLT 0 … 19 = 10 µs … 30 ks (the same tables for both); SLVL
 0.004 … 5.000 V rms; FREQ 0.001 … 102 000 Hz (internal reference only); time
@@ -15,6 +17,7 @@ read back, so a value the lock-in refused or adjusted is reported.
 from __future__ import annotations
 
 import math
+from typing import ClassVar
 
 from .definitions import describe, prop_bounds
 from .protocols import FieldInfo
@@ -35,6 +38,9 @@ class _SRSLockin:
     DEFINITION = "srs_lockin"
     SENSITIVITY = SENSITIVITY
     TIME_CONSTANT = TIME_CONSTANT
+    # FMOD? -> reference source; the two models number them differently
+    REFERENCE_SOURCES: ClassVar[dict[int, str]] = {}
+    INTERNAL = 0
 
     def __init__(self, name: str, transport: Transport, frequency: float | None = None,
                  amplitude: float = 0.1, time_constant: float = 0.1,
@@ -94,12 +100,15 @@ class _SRSLockin:
         return float(value)
 
     async def set_frequency(self, hz: float) -> float:
-        """Internal reference frequency; refused while following an external
-        reference, and when harmonic * frequency would exceed 102 kHz."""
+        """Internal reference frequency; refused unless the reference source is
+        internal (FREQ is set only then), and when harmonic * frequency would
+        exceed 102 kHz."""
         hz = self._check("frequency", hz, DriverError)
-        if (await self.t.query("FMOD?")).strip() == "0":
-            raise DriverError(f"{self.name}: the reference is external; the frequency "
-                              "follows the reference input")
+        source = int(float(await self.t.query("FMOD?")))
+        if source != self.INTERNAL:
+            what = self.REFERENCE_SOURCES.get(source, f"FMOD {source}")
+            raise DriverError(f"{self.name}: the reference source is {what}; the frequency "
+                              "can be set only with the internal reference")
         harm = int(float(await self.t.query("HARM?")))
         if harm * hz > 102e3:
             raise DriverError(f"{self.name}: harmonic {harm} * {hz:g} Hz is above 102 kHz")
@@ -159,7 +168,12 @@ class _SRSLockin:
 
 class SR830(_SRSLockin):
     model = "SR830"
+    REFERENCE_SOURCES: ClassVar[dict[int, str]] = {0: "external", 1: "internal"}
+    INTERNAL = 1
 
 
 class SR850(_SRSLockin):
     model = "SR850"
+    REFERENCE_SOURCES: ClassVar[dict[int, str]] = {0: "internal", 1: "internal sweep",
+                                                   2: "external"}
+    INTERNAL = 0
